@@ -1,0 +1,45 @@
+/* Global styles for the CMS admin shell. */
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  font-family: 'Segoe UI', 'Microsoft JhengHei', system-ui, -apple-system, sans-serif;
+  color: var(--p-text-color);
+  background: var(--p-surface-50);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.page-title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 1rem;
+}
+
+.field label {
+  font-weight: 500;
+  font-size: 0.875rem;
+}
+
+.field-error {
+  color: var(--p-red-500);
+  font-size: 0.8125rem;
+}

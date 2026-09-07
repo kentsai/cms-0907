@@ -1,0 +1,53 @@
+.app-shell {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  grid-template-rows: 56px 1fr;
+  grid-template-areas:
+    'topbar topbar'
+    'sidebar content';
+  height: 100vh;
+  transition: grid-template-columns 0.2s ease;
+}
+
+.app-shell--collapsed {
+  grid-template-columns: 0 1fr;
+
+  .app-sidebar {
+    overflow: hidden;
+    border-right: none;
+  }
+}
+
+.app-topbar {
+  grid-area: topbar;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0 0.75rem;
+  border-bottom: 1px solid var(--p-content-border-color);
+  background: var(--p-content-background);
+}
+
+.app-topbar__title {
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.app-sidebar {
+  grid-area: sidebar;
+  padding: 0.75rem;
+  border-right: 1px solid var(--p-content-border-color);
+  background: var(--p-content-background);
+  overflow-y: auto;
+}
+
+.app-content {
+  grid-area: content;
+  padding: 1.25rem;
+  overflow: auto;
+  background: var(--p-surface-50);
+}
+
+:host ::ng-deep .app-sidebar__menu .p-panelmenu-panel {
+  border: none;
+}

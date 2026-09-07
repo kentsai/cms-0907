@@ -1,0 +1,42 @@
+# ---- .NET ----
+bin/
+obj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+artifacts/
+[Ll]og/
+[Ll]ogs/
+
+# ---- Visual Studio / Rider / VS Code ----
+.vs/
+.idea/
+*.swp
+
+# ---- Node / Angular ----
+node_modules/
+dist/
+.angular/
+npm-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# ---- Test / coverage output ----
+TestResults/
+coverage/
+*.trx
+*.coverage
+*.opencover.xml
+
+# ---- OS ----
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store
+
+# ---- Local secrets / overrides ----
+appsettings.Local.json
+
+# Personal Claude Code permissions, not shared with the team
+.claude/settings.local.json

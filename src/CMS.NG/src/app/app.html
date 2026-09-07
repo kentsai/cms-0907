@@ -1,0 +1,22 @@
+<div class="app-shell" [class.app-shell--collapsed]="sidebarCollapsed()">
+  <header class="app-topbar">
+    <button
+      type="button"
+      class="app-topbar__toggle"
+      pButton
+      text
+      rounded
+      icon="pi pi-bars"
+      [attr.aria-label]="sidebarCollapsed() ? '展開選單' : '收合選單'"
+      (click)="toggleSidebar()"></button>
+    <span class="app-topbar__title">{{ title() }}</span>
+  </header>
+
+  <aside class="app-sidebar">
+    <p-panelmenu [model]="menuItems" styleClass="app-sidebar__menu" />
+  </aside>
+
+  <main class="app-content">
+    <router-outlet />
+  </main>
+</div>
