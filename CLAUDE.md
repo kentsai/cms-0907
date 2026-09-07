@@ -72,7 +72,28 @@ cd C:\dev\cms\src\CMS.NG; npx ng test --watch=false --browsers=ChromeHeadless
 The sidebar is a PrimeNG `PanelMenu` driven by the `menuItems` array. Add new features as
 entries there.
 
-Current menu: `系統管理 Admin` → `角色 AppRole` → routes to `/admin/app-roles`.
+Current menu: `系統管理 Admin` → `角色 AppRole` (`/admin/app-roles`, no route yet) and
+`發布狀態 PublishStatus` (`/admin/publish-statuses`).
+
+`<p-toast/>` and `<p-confirmdialog/>` are rendered once in `app.html`; `MessageService`
+and `ConfirmationService` are provided app-wide in `app.config.ts`. Feature pages only
+inject them. Any TestBed that mounts `App` or a feature page must provide both.
+
+### Shared feature infrastructure (added with PublishStatus)
+
+- `Infrastructure\RowAuditWriter.cs` (`IRowAuditWriter`) writes `dbo.RowAudit` on the
+  caller's connection/transaction. User name falls back to `"system"` (no auth yet).
+- `Infrastructure\AuditHelper.ChangedColumns` diffs a model against a request by property
+  name for UPDATE audit descriptions.
+- `Infrastructure\EntityInUseException` — repositories throw it on SQL error 547 (FK
+  violation); controllers return 409.
+- `Controllers\LookupsController` (`/api/lookups/*`) and `core/services/lookup.service.ts`
+  — add one action/method per FK-target table.
+- `Controllers\RowAuditsController` (`GET /api/row-audits/{table}/{pk}`) feeds
+  `core/components/row-audit-badge` shown in detail/edit toolbars.
+- `core/utils/session-storage.util.ts` — guarded read/write for `{entity}-list-*` keys.
+
+Feature specs live in `spec\{sub-system}\{Table}.md`; generate/build them with `/crud`.
 
 ## Environment gotchas
 
@@ -96,12 +117,14 @@ These cost real time in a previous session — check them before debugging furth
 
 ## Status
 
-Scaffolding is complete and verified: solution builds with 0 warnings, API returns 200 on
-`/swagger`, `ng build` succeeds, and 4 Angular tests pass.
+Scaffolding is complete and verified: solution builds with 0 warnings, `ng build` succeeds.
 
-**Not yet built — blocked on missing inputs.** `database\` and `spec\` are empty. The
-first feature (AppRole CRUD: list with query filter, view, edit, add, plus xUnit and
-Angular tests) needs `database\auth.sql` for the real column names, and
-`spec\code-gen.convention.md` for naming/layering. The shell's `/admin/app-roles` link
-currently has no route behind it. The shell styling is a conventional admin layout, not
-derived from `spec\ui-sample-*.png`, which were never supplied.
+**Built:** `PublishStatus` CRUD (spec at `spec\admin\PublishStatus.md`) — API, Angular
+list/detail/form, lookup endpoint, RowAudit plumbing, 19 xUnit + 30 Karma tests passing.
+
+**Not yet built:** `AppRole` CRUD — the shell's `/admin/app-roles` link has no route
+behind it. Schema is in `database\admin.sql`.
+
+**Local DB caveat:** `.\SQLEXPRESS` is running but has **no `CMS` database** (only the
+four system DBs). The API compiles and serves Swagger, but every data endpoint will fail
+until the database is created from `database\*.sql`.

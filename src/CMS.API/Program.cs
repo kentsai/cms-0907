@@ -1,4 +1,5 @@
 using CMS.API.Infrastructure;
+using CMS.API.Repositories;
 using Microsoft.OpenApi.Models;
 
 const string LocalhostCorsPolicy = "LocalhostCorsPolicy";
@@ -25,6 +26,14 @@ builder.Services.AddCors(options =>
 });
 
 builder.Services.AddSingleton<IDbConnectionFactory, SqlConnectionFactory>();
+
+// RowAudit needs the current user name; there is no auth yet so it falls back to "system".
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<IRowAuditWriter, RowAuditWriter>();
+builder.Services.AddScoped<IRowAuditRepository, RowAuditRepository>();
+
+// Feature repositories
+builder.Services.AddScoped<IPublishStatusRepository, PublishStatusRepository>();
 
 var app = builder.Build();
 

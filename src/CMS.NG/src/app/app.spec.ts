@@ -1,13 +1,14 @@
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { ConfirmationService, MessageService } from 'primeng/api';
 import { App } from './app';
 
 describe('App', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [App],
-      providers: [provideRouter([]), provideNoopAnimations()]
+      providers: [provideRouter([]), provideNoopAnimations(), MessageService, ConfirmationService]
     }).compileComponents();
   });
 
@@ -30,6 +31,14 @@ describe('App', () => {
 
     const sidebarText = (fixture.nativeElement as HTMLElement).querySelector('.app-sidebar')?.textContent ?? '';
     expect(sidebarText).toContain('系統管理 Admin');
+  });
+
+  it('should list PublishStatus under the Admin menu group', () => {
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+
+    const sidebarText = (fixture.nativeElement as HTMLElement).querySelector('.app-sidebar')?.textContent ?? '';
+    expect(sidebarText).toContain('發布狀態 PublishStatus');
   });
 
   it('should toggle the sidebar collapsed state', () => {
