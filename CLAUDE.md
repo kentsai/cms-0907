@@ -72,8 +72,9 @@ cd C:\dev\cms\src\CMS.NG; npx ng test --watch=false --browsers=ChromeHeadless
 The sidebar is a PrimeNG `PanelMenu` driven by the `menuItems` array. Add new features as
 entries there.
 
-Current menu: `系統管理 Admin` → `角色 AppRole` (`/admin/app-roles`, no route yet) and
-`發布狀態 PublishStatus` (`/admin/publish-statuses`).
+Current menu: `系統管理 Admin` → `角色 AppRole` (`/admin/app-roles`) and
+`發布狀態 PublishStatus` (`/admin/publish-statuses`); `課程管理 Course` → `合作夥伴 Partner`
+(`/course/partners`).
 
 `<p-toast/>` and `<p-confirmdialog/>` are rendered once in `app.html`; `MessageService`
 and `ConfirmationService` are provided app-wide in `app.config.ts`. Feature pages only
@@ -114,16 +115,56 @@ These cost real time in a previous session — check them before debugging furth
   version if that package is ever needed.
 - Node lives at `C:\Program Files\nodejs`; it is not always on `PATH` in non-interactive
   shells.
+- **`winget` is unreliable here — don't install with it.** `winget install` hung
+  indefinitely (10+ min at ~0.9s CPU, no installer child process, nothing installed) and
+  had to be killed. Separately, `winget list` aborts with `0x8a150042` because the
+  `msstore` source demands an interactive agreement prompt that a non-interactive shell
+  cannot answer; `--accept-source-agreements` does not suppress it. Download vendor
+  installers directly instead — e.g. VS Code from
+  `https://update.code.visualstudio.com/latest/win32-x64-user/stable`, then run it with
+  `/VERYSILENT /SUPPRESSMSGBOXES /NORESTART` (add `/MERGETASKS=...,addtopath`).
+- **VS Code lives at `%LOCALAPPDATA%\Programs\Microsoft VS Code` (1.136.1).** It was
+  previously a user install on `D:\Microsoft VS Code`; that copy was uninstalled. `code`
+  is on `PATH` via `bin\code.cmd`.
+- **A commit-hash subfolder in the VS Code install root is normal, not corruption.** The
+  install root holds only `Code.exe`, `bin\`, `unins000.*` and a folder named for the
+  build commit (e.g. `a44adf7f53`) that contains `resources\`, `locales\` and the DLLs.
+  Several such folders accumulate across updates. A clean install from Microsoft's signed
+  installer produces exactly this shape — do not diagnose it as a broken/half-updated
+  install.
 
 ## Status
 
 Scaffolding is complete and verified: solution builds with 0 warnings, `ng build` succeeds.
 
 **Built:** `PublishStatus` CRUD (spec at `spec\admin\PublishStatus.md`) — API, Angular
-list/detail/form, lookup endpoint, RowAudit plumbing, 19 xUnit + 30 Karma tests passing.
+list/detail/form, lookup endpoint, RowAudit plumbing, 19 xUnit + 31 Karma tests passing.
+Committed and pushed to `origin/develop` (`9f2fd4c`).
 
-**Not yet built:** `AppRole` CRUD — the shell's `/admin/app-roles` link has no route
-behind it. Schema is in `database\admin.sql`.
+**Built:** `AppRole` CRUD (spec at `spec\admin\AppRole.md`) — string PK `RoleId` (routes
+use `{id}` with no `:int`; the service URL-encodes it), `pkid` is display-only, N-N with
+`AppUser` via `AppUserRole` managed by a `p-multiselect` (delete-then-reinsert in the same
+transaction). Adds `StringLookupItem`, `ILookupRepository`/`LookupRepository` (app-users
+lookup), and `/api/lookups/app-roles` + `app-users`. Totals now 39 xUnit + 55 Karma tests.
+Committed together with `Partner` (see below).
+
+**Built:** `Partner` CRUD (spec at `spec\course\Partner.md`) — smallint IDENTITY PK, no FKs,
+five inbound references (Course, Certification, PartnerCourseGroup, Seminar, Promotion2) shown
+as link buttons. `AppKey` / `ImageFilename` are `varchar`, so both sides enforce printable-ASCII.
+`PartnerCourseGroup` is treated as a child entity, not an N-N junction (it has its own
+columns). Adds `/api/lookups/partners`. First entry in the new `課程管理 Course` menu group.
+Totals now 66 xUnit + 83 Karma tests. Committed and pushed to `origin/develop`.
+
+**Not yet built:** `AppUser` (schema in `database\admin.sql`; its lookup already exists
+in `LookupRepository` — move it to the AppUser repository when that feature is generated),
+plus everything else in `course.sql` / `promotion.sql` / `auth.sql`.
+
+**Build gotcha:** if `dotnet build` fails with MSB3027 on `CMS.API.exe`, the API is
+running from `bin\` (e.g. `dotnet run` in another terminal). Don't kill it blindly —
+build/test with `-p:ArtifactsPath=<some tmp dir>` to bypass the locked folder.
+
+**Shell tooling note:** `python` is not installed; the `python` command resolves to the
+Windows Store alias and hangs a non-interactive shell. Use the Edit/Write tools or `perl`.
 
 **Local DB caveat:** `.\SQLEXPRESS` is running but has **no `CMS` database** (only the
 four system DBs). The API compiles and serves Swagger, but every data endpoint will fail

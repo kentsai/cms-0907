@@ -1,0 +1,93 @@
+<form [formGroup]="form" (ngSubmit)="save()" novalidate>
+  <p-toolbar styleClass="page-toolbar">
+    <ng-template #start>
+      <div class="toolbar-title">
+        <h1>{{ title }}</h1>
+        @if (isEdit && pkid !== null) {
+          <span class="toolbar-title__sub">主代碼 {{ pkid }}</span>
+          <app-row-audit-badge tableName="Partner" [pk]="pkid" />
+        }
+      </div>
+    </ng-template>
+    <ng-template #end>
+      <div class="toolbar-actions">
+        <p-button label="取消" icon="pi pi-times" severity="secondary" type="button" (onClick)="cancel()" />
+        <p-button label="儲存" icon="pi pi-check" severity="success" type="submit" [loading]="saving()" [disabled]="form.invalid || saving() || loading()" />
+      </div>
+    </ng-template>
+  </p-toolbar>
+
+  <p-card header="夥伴資料" styleClass="form-card">
+    <div class="form-grid">
+      <div class="field">
+        <label for="name">名稱 <span class="required">*</span></label>
+        <input id="name" pInputText formControlName="name" maxlength="50" placeholder="請輸入名稱" autocomplete="off" />
+        @if (isInvalid('name')) {
+          <small class="error">請輸入名稱（最多 50 字）</small>
+        }
+      </div>
+
+      <div class="field">
+        <label for="appKey">應用程式代碼 <span class="required">*</span></label>
+        <input id="appKey" pInputText formControlName="appKey" maxlength="10" placeholder="例如 MS、CISCO" autocomplete="off" />
+        @if (isInvalid('appKey')) {
+          <small class="error">
+            @if (form.controls.appKey.hasError('pattern')) {
+              只能輸入英數字與符號（不可含空白或中文）
+            } @else {
+              請輸入應用程式代碼（最多 10 字元）
+            }
+          </small>
+        } @else {
+          <small class="hint">前台使用的短代碼；英數字，最多 10 字元</small>
+        }
+      </div>
+
+      <div class="field">
+        <label for="nameOnPartnerMenu">夥伴選單名稱 <span class="required">*</span></label>
+        <input id="nameOnPartnerMenu" pInputText formControlName="nameOnPartnerMenu" maxlength="200" placeholder="顯示於前台夥伴選單" autocomplete="off" />
+        @if (isInvalid('nameOnPartnerMenu')) {
+          <small class="error">請輸入夥伴選單名稱（最多 200 字）</small>
+        }
+      </div>
+
+      <div class="field">
+        <label for="nameOnCourseDetailPage">課程頁顯示名稱 <span class="required">*</span></label>
+        <input id="nameOnCourseDetailPage" pInputText formControlName="nameOnCourseDetailPage" maxlength="50" placeholder="顯示於課程詳細頁" autocomplete="off" />
+        @if (isInvalid('nameOnCourseDetailPage')) {
+          <small class="error">請輸入課程頁顯示名稱（最多 50 字）</small>
+        }
+      </div>
+
+      <div class="field field--narrow">
+        <label for="displayOrder">顯示順序 <span class="required">*</span></label>
+        <p-inputnumber
+          inputId="displayOrder"
+          formControlName="displayOrder"
+          [useGrouping]="false"
+          [showButtons]="true"
+          styleClass="w-full"
+          [class.ng-invalid]="isInvalid('displayOrder')" />
+        @if (isInvalid('displayOrder')) {
+          <small class="error">請輸入顯示順序</small>
+        } @else {
+          <small class="hint">數字越小越前面</small>
+        }
+      </div>
+
+      <div class="field">
+        <label for="imageFilename">圖片檔名</label>
+        <input id="imageFilename" pInputText formControlName="imageFilename" maxlength="50" placeholder="例如 microsoft.png（選填）" autocomplete="off" />
+        @if (isInvalid('imageFilename')) {
+          <small class="error">
+            @if (form.controls.imageFilename.hasError('pattern')) {
+              只能輸入英數字與符號（不可含空白或中文）
+            } @else {
+              圖片檔名最多 50 字元
+            }
+          </small>
+        }
+      </div>
+    </div>
+  </p-card>
+</form>

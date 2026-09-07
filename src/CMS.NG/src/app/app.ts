@@ -33,6 +33,18 @@ export class App {
           routerLink: '/admin/publish-statuses'
         }
       ]
+    },
+    {
+      label: '課程管理 Course',
+      icon: 'pi pi-book',
+      expanded: true,
+      items: [
+        {
+          label: '合作夥伴 Partner',
+          icon: 'pi pi-building',
+          routerLink: '/course/partners'
+        }
+      ]
     }
   ];
 

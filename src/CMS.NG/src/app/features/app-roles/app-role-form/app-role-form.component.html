@@ -1,0 +1,78 @@
+<form [formGroup]="form" (ngSubmit)="save()" novalidate>
+  <p-toolbar styleClass="page-toolbar">
+    <ng-template #start>
+      <div class="toolbar-title">
+        <h1>{{ title }}</h1>
+        @if (isEdit && roleId !== null) {
+          <app-row-audit-badge tableName="AppRole" [pk]="roleId" />
+        }
+      </div>
+    </ng-template>
+    <ng-template #end>
+      <div class="toolbar-actions">
+        <p-button label="取消" icon="pi pi-times" severity="secondary" type="button" (onClick)="cancel()" />
+        <p-button label="儲存" icon="pi pi-check" severity="success" type="submit" [loading]="saving()" [disabled]="form.invalid || saving() || loading()" />
+      </div>
+    </ng-template>
+  </p-toolbar>
+
+  <p-card header="角色資料" styleClass="form-card">
+    <div class="form-grid">
+      <div class="field">
+        <label for="roleId">角色代碼 <span class="required">*</span></label>
+        <input id="roleId" pInputText formControlName="roleId" maxlength="200" placeholder="請輸入角色代碼" autocomplete="off" />
+        @if (isInvalid('roleId')) {
+          <small class="error">
+            @if (form.controls.roleId.hasError('duplicate')) {
+              角色代碼已存在
+            } @else {
+              請輸入角色代碼（最多 200 字）
+            }
+          </small>
+        } @else if (isEdit) {
+          <small class="hint">角色代碼建立後不可修改</small>
+        }
+      </div>
+
+      <div class="field">
+        <label for="roleName">角色名稱 <span class="required">*</span></label>
+        <input id="roleName" pInputText formControlName="roleName" maxlength="200" autocomplete="off" />
+        @if (isInvalid('roleName')) {
+          <small class="error">請輸入角色名稱（最多 200 字）</small>
+        }
+      </div>
+
+      <div class="field">
+        <label for="permissionLevel">權限等級 <span class="required">*</span></label>
+        <p-inputnumber inputId="permissionLevel" formControlName="permissionLevel" [useGrouping]="false" [showButtons]="true" styleClass="w-full" />
+        @if (isInvalid('permissionLevel')) {
+          <small class="error">請輸入權限等級</small>
+        }
+      </div>
+
+      <div class="field">
+        <label for="description">描述</label>
+        <input id="description" pInputText formControlName="description" maxlength="400" autocomplete="off" />
+        @if (isInvalid('description')) {
+          <small class="error">描述最多 400 字</small>
+        }
+      </div>
+    </div>
+  </p-card>
+
+  <p-card header="使用者" styleClass="form-card">
+    <p-multiselect
+      inputId="userIds"
+      formControlName="userIds"
+      [options]="users()"
+      optionLabel="label"
+      optionValue="id"
+      [filter]="true"
+      filterBy="label"
+      [maxSelectedLabels]="9999"
+      display="chip"
+      placeholder="選擇使用者（可複選）"
+      appendTo="body"
+      styleClass="w-full user-select" />
+  </p-card>
+</form>

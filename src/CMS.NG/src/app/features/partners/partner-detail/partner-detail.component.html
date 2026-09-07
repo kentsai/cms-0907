@@ -1,0 +1,91 @@
+<p-toolbar styleClass="page-toolbar">
+  <ng-template #start>
+    <div class="toolbar-title">
+      <h1>合作夥伴</h1>
+      @if (item(); as it) {
+        <span class="toolbar-title__sub">{{ it.pkid }}　{{ it.name }}</span>
+        <app-row-audit-badge tableName="Partner" [pk]="it.pkid" />
+      }
+    </div>
+  </ng-template>
+  <ng-template #end>
+    <div class="toolbar-actions">
+      <p-button label="返回" icon="pi pi-arrow-left" severity="secondary" [outlined]="true" (onClick)="back()" />
+      <p-button label="編輯" icon="pi pi-pencil" [disabled]="!item()" (onClick)="edit()" />
+      <p-button label="刪除" icon="pi pi-trash" severity="danger" [outlined]="true" [disabled]="!item()" (onClick)="confirmDelete()" />
+    </div>
+  </ng-template>
+</p-toolbar>
+
+@if (loading()) {
+  <p class="state">載入中…</p>
+} @else if (notFound()) {
+  <p-card>
+    <p class="state">找不到主代碼 {{ pkid }} 的合作夥伴。</p>
+  </p-card>
+} @else if (item(); as it) {
+  <p-card header="夥伴資料" styleClass="detail-card">
+    <dl class="detail-grid">
+      <dt>主代碼</dt>
+      <dd>{{ it.pkid }}</dd>
+
+      <dt>名稱</dt>
+      <dd>{{ it.name }}</dd>
+
+      <dt>應用程式代碼</dt>
+      <dd><code>{{ it.appKey }}</code></dd>
+
+      <dt>夥伴選單名稱</dt>
+      <dd>{{ it.nameOnPartnerMenu }}</dd>
+
+      <dt>課程頁顯示名稱</dt>
+      <dd>{{ it.nameOnCourseDetailPage }}</dd>
+
+      <dt>顯示順序</dt>
+      <dd>{{ it.displayOrder }}</dd>
+
+      <dt>圖片檔名</dt>
+      <dd>{{ it.imageFilename || '—' }}</dd>
+    </dl>
+  </p-card>
+
+  <p-card header="相關資料" styleClass="detail-card">
+    <div class="related-links">
+      <p-button
+        label="查看課程"
+        icon="pi pi-book"
+        severity="secondary"
+        [outlined]="true"
+        routerLink="/course/courses"
+        [queryParams]="{ partnerPkid: it.pkid }" />
+      <p-button
+        label="查看認證"
+        icon="pi pi-verified"
+        severity="secondary"
+        [outlined]="true"
+        routerLink="/course/certifications"
+        [queryParams]="{ partnerPkid: it.pkid }" />
+      <p-button
+        label="查看課程群組"
+        icon="pi pi-sitemap"
+        severity="secondary"
+        [outlined]="true"
+        routerLink="/course/partner-course-groups"
+        [queryParams]="{ partnerPkid: it.pkid }" />
+      <p-button
+        label="查看說明會"
+        icon="pi pi-calendar"
+        severity="secondary"
+        [outlined]="true"
+        routerLink="/promotion/seminars"
+        [queryParams]="{ partnerPkid: it.pkid }" />
+      <p-button
+        label="查看活動"
+        icon="pi pi-megaphone"
+        severity="secondary"
+        [outlined]="true"
+        routerLink="/promotion/promotions"
+        [queryParams]="{ relatedPartnerPkid: it.pkid }" />
+    </div>
+  </p-card>
+}

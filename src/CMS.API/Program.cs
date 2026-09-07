@@ -31,9 +31,12 @@ builder.Services.AddSingleton<IDbConnectionFactory, SqlConnectionFactory>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<IRowAuditWriter, RowAuditWriter>();
 builder.Services.AddScoped<IRowAuditRepository, RowAuditRepository>();
+builder.Services.AddScoped<ILookupRepository, LookupRepository>();
 
 // Feature repositories
 builder.Services.AddScoped<IPublishStatusRepository, PublishStatusRepository>();
+builder.Services.AddScoped<IAppRoleRepository, AppRoleRepository>();
+builder.Services.AddScoped<IPartnerRepository, PartnerRepository>();
 
 var app = builder.Build();
 

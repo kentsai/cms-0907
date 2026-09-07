@@ -41,6 +41,15 @@ describe('App', () => {
     expect(sidebarText).toContain('發布狀態 PublishStatus');
   });
 
+  it('should list Partner under the Course menu group', () => {
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+
+    const sidebarText = (fixture.nativeElement as HTMLElement).querySelector('.app-sidebar')?.textContent ?? '';
+    expect(sidebarText).toContain('課程管理 Course');
+    expect(sidebarText).toContain('合作夥伴 Partner');
+  });
+
   it('should toggle the sidebar collapsed state', () => {
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();

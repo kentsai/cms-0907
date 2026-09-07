@@ -1,0 +1,78 @@
+:host {
+  display: block;
+}
+
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+::ng-deep .page-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+
+.toolbar-title {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+
+  h1 {
+    margin: 0;
+    font-size: 1.125rem;
+    font-weight: 600;
+  }
+
+  &__sub {
+    color: var(--p-text-muted-color);
+  }
+}
+
+.toolbar-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.form-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+
+  label {
+    font-weight: 600;
+    font-size: 0.875rem;
+  }
+
+  input {
+    width: 100%;
+  }
+
+  &--narrow {
+    max-width: 16rem;
+  }
+}
+
+.required {
+  color: var(--p-red-500);
+}
+
+.error {
+  color: var(--p-red-500);
+}
+
+.hint {
+  color: var(--p-text-muted-color);
+}
+
+::ng-deep .form-card .w-full,
+::ng-deep .form-card .w-full input {
+  width: 100%;
+}

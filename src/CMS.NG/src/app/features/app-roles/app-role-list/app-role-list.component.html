@@ -1,0 +1,106 @@
+<div class="page">
+  <header class="page-header">
+    <div class="page-header__title">
+      <h1>角色 AppRole</h1>
+      <span class="page-header__subtitle">使用者角色</span>
+    </div>
+    <div class="page-header__actions">
+      <p-button
+        label="搜尋條件"
+        icon="pi pi-filter"
+        severity="secondary"
+        [badge]="filterBadge"
+        badgeSeverity="info"
+        (onClick)="openFilters()" />
+      <p-button label="新增" icon="pi pi-plus" severity="success" routerLink="/admin/app-roles/new" />
+    </div>
+  </header>
+
+  <section class="page-body">
+    <p-table
+      [value]="items()"
+      [loading]="loading()"
+      dataKey="roleId"
+      [paginator]="true"
+      paginatorPosition="top"
+      [rows]="rows"
+      [first]="first"
+      [rowsPerPageOptions]="rowsPerPageOptions"
+      [showCurrentPageReport]="true"
+      currentPageReportTemplate="{first}–{last} 筆，共 {totalRecords} 筆"
+      [sortField]="sortField"
+      [sortOrder]="sortOrder"
+      (onSort)="onSort($event)"
+      (onPage)="onPage($event)"
+      [rowHover]="true"
+      styleClass="p-datatable-sm app-role-table">
+      <ng-template #header>
+        <tr>
+          <th pSortableColumn="pkid" class="col-pkid">主代碼 <p-sortIcon field="pkid" /></th>
+          <th pSortableColumn="roleId">角色代碼 <p-sortIcon field="roleId" /></th>
+          <th pSortableColumn="roleName">角色名稱 <p-sortIcon field="roleName" /></th>
+          <th pSortableColumn="permissionLevel" class="col-num">權限等級 <p-sortIcon field="permissionLevel" /></th>
+          <th pSortableColumn="description">描述 <p-sortIcon field="description" /></th>
+          <th pSortableColumn="userCount" class="col-num">使用者數 <p-sortIcon field="userCount" /></th>
+          <th class="col-actions">操作</th>
+        </tr>
+      </ng-template>
+      <ng-template #body let-item>
+        <tr>
+          <td class="col-pkid">{{ item.pkid }}</td>
+          <td>{{ item.roleId }}</td>
+          <td>{{ item.roleName }}</td>
+          <td class="col-num">{{ item.permissionLevel }}</td>
+          <td>{{ item.description }}</td>
+          <td class="col-num">{{ item.userCount }}</td>
+          <td class="col-actions">
+            <p-button icon="pi pi-eye" [text]="true" [rounded]="true" size="small" pTooltip="檢視" tooltipPosition="top" (onClick)="view(item)" />
+            <p-button icon="pi pi-pencil" [text]="true" [rounded]="true" size="small" pTooltip="編輯" tooltipPosition="top" (onClick)="edit(item)" />
+            <p-button icon="pi pi-trash" [text]="true" [rounded]="true" size="small" severity="danger" pTooltip="刪除" tooltipPosition="top" (onClick)="confirmDelete(item)" />
+          </td>
+        </tr>
+      </ng-template>
+      <ng-template #emptymessage>
+        <tr>
+          <td colspan="7" class="empty">沒有符合條件的資料。</td>
+        </tr>
+      </ng-template>
+    </p-table>
+  </section>
+</div>
+
+<p-drawer [visible]="filterVisible()" (visibleChange)="filterVisible.set($event)" position="right" header="搜尋條件" styleClass="filter-drawer">
+  <form class="filter-form" (ngSubmit)="search()">
+    <div class="field">
+      <label for="f-keyword">關鍵字</label>
+      <input id="f-keyword" pInputText name="keyword" [(ngModel)]="filters.keyword" placeholder="角色代碼／角色名稱" autocomplete="off" />
+    </div>
+
+    <div class="field">
+      <label for="f-permissionLevel">權限等級</label>
+      <p-inputnumber inputId="f-permissionLevel" name="permissionLevel" [(ngModel)]="filters.permissionLevel" [useGrouping]="false" placeholder="全部" styleClass="w-full" />
+    </div>
+
+    <div class="field">
+      <label for="f-userId">使用者</label>
+      <p-select
+        inputId="f-userId"
+        name="userId"
+        [(ngModel)]="filters.userId"
+        [options]="users()"
+        optionLabel="label"
+        optionValue="id"
+        [filter]="true"
+        filterBy="label"
+        [showClear]="true"
+        placeholder="全部"
+        appendTo="body"
+        styleClass="w-full" />
+    </div>
+
+    <div class="filter-form__actions">
+      <p-button label="清除" icon="pi pi-times" severity="secondary" [outlined]="true" type="button" (onClick)="clearFilters()" />
+      <p-button label="查詢" icon="pi pi-search" type="submit" />
+    </div>
+  </form>
+</p-drawer>
