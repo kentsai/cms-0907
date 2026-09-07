@@ -72,9 +72,10 @@ cd C:\dev\cms\src\CMS.NG; npx ng test --watch=false --browsers=ChromeHeadless
 The sidebar is a PrimeNG `PanelMenu` driven by the `menuItems` array. Add new features as
 entries there.
 
-Current menu: `系統管理 Admin` → `角色 AppRole` (`/admin/app-roles`) and
-`發布狀態 PublishStatus` (`/admin/publish-statuses`); `課程管理 Course` → `合作夥伴 Partner`
-(`/course/partners`).
+Current menu: `系統管理 Admin` → `角色 AppRole` (`/admin/app-roles`), `使用者 AppUser`
+(`/admin/app-users`), `發布狀態 PublishStatus` (`/admin/publish-statuses`);
+`課程管理 Course` → `合作夥伴 Partner` (`/course/partners`), `課程群組 CourseGroup`
+(`/course/course-groups`), `課程 Course` (`/course/courses`).
 
 `<p-toast/>` and `<p-confirmdialog/>` are rendered once in `app.html`; `MessageService`
 and `ConfirmationService` are provided app-wide in `app.config.ts`. Feature pages only
@@ -89,10 +90,21 @@ inject them. Any TestBed that mounts `App` or a feature page must provide both.
 - `Infrastructure\EntityInUseException` — repositories throw it on SQL error 547 (FK
   violation); controllers return 409.
 - `Controllers\LookupsController` (`/api/lookups/*`) and `core/services/lookup.service.ts`
-  — add one action/method per FK-target table.
+  — add one action/method per FK-target table. Tables with their own repository expose
+  `GetLookupAsync` there; `LookupRepository` holds only lookups for tables that have **no**
+  feature yet (currently `certifications`, `job-categories`) — move each one out when its
+  feature is generated.
 - `Controllers\RowAuditsController` (`GET /api/row-audits/{table}/{pk}`) feeds
   `core/components/row-audit-badge` shown in detail/edit toolbars.
 - `core/utils/session-storage.util.ts` — guarded read/write for `{entity}-list-*` keys.
+- `core/utils/date.util.ts` — `toIso` / `fromIso` / `addYears` for `date` columns (local
+  components only, never `toISOString`). Dapper 2.1.79 maps `DateOnly` natively, so no
+  type handler is registered in `Program.cs`.
+- `core/utils/ascii.validator.ts` — `asciiValidator` for `varchar` columns
+  (`partner.model.ts` re-exports it for older imports).
+- `Infrastructure\PasswordHasher` (SHA-256 → lowercase hex) and
+  `Infrastructure\AppConfigJson` (reads `defaultPassword` out of the `SysConfig.appConfig`
+  JSON; throws `AppConfigException` → controllers return 500).
 
 Feature specs live in `spec\{sub-system}\{Table}.md`; generate/build them with `/crud`.
 
@@ -115,6 +127,11 @@ These cost real time in a previous session — check them before debugging furth
   version if that package is ever needed.
 - Node lives at `C:\Program Files\nodejs`; it is not always on `PATH` in non-interactive
   shells.
+- **Do not edit files containing Chinese text through Bash `perl`/heredocs.** A Bash
+  heredoc holding CJK content failed to parse (`unexpected EOF while looking for matching
+  quote`), and `perl -pi` with a `\x{...}` replacement upgraded the whole file to wide
+  chars and **double-encoded every existing Chinese string** (`草稿` → `èç¨¿`). Use the
+  Write/Edit tools for any file with non-ASCII content; `perl` is fine for ASCII-only edits.
 - **`winget` is unreliable here — don't install with it.** `winget install` hung
   indefinitely (10+ min at ~0.9s CPU, no installer child process, nothing installed) and
   had to be killed. Separately, `winget list` aborts with `0x8a150042` because the
@@ -155,9 +172,35 @@ as link buttons. `AppKey` / `ImageFilename` are `varchar`, so both sides enforce
 columns). Adds `/api/lookups/partners`. First entry in the new `課程管理 Course` menu group.
 Totals now 66 xUnit + 83 Karma tests. Committed and pushed to `origin/develop`.
 
-**Not yet built:** `AppUser` (schema in `database\admin.sql`; its lookup already exists
-in `LookupRepository` — move it to the AppUser repository when that feature is generated),
-plus everything else in `course.sql` / `promotion.sql` / `auth.sql`.
+**Built:** `CourseGroup` CRUD (spec at `spec\course\CourseGroup.md`) — smallint IDENTITY PK,
+one `Description` column, referenced by `Course` and `PartnerCourseGroup` (link buttons).
+Adds `/api/lookups/course-groups`. Default sort `pkid DESC` (no DisplayOrder column).
+
+**Built:** `Course` CRUD (spec at `spec\course\Course.md`) — int IDENTITY PK; FKs to
+Partner / CourseGroup (nullable) / PublishStatus are **JOINed** so every row carries
+`partnerName`, `courseGroupDescription`, `publishStatusDescription` (the list shows those
+labels, per the requested column set); N-N `CourseInCertification` + `CourseJobCategories`
+via two `p-multiselect`s (delete-then-reinsert; both junctions `ON DELETE CASCADE`);
+`date` columns as `DateOnly` with `p-datepicker`; `ScheduleOff` auto-defaults to
+`ScheduleOn + 10y`. Adds `/api/lookups/courses`, `certifications`, `job-categories`.
+Deliberately **not** built from the sample spec: the `/copy` action, QR code, print-to-PDF
+and the CourseRelatedLink / CourseRecomm sub-panels; `ClassSection` is not in the schema.
+
+**Built:** `AppUser` CRUD (spec at `spec\auth\AppUser.md`) — string PK `UserId`, N-N with
+`AppRole` via `AppUserRole`. **`PasswordHash` never crosses the API**: create seeds it with
+SHA-256 of `SysConfig.appConfig.defaultPassword`, update never touches it, and
+`POST /api/app-users/{id}/reset-password` re-applies the default (detail page has a 重設密碼
+button). The `app-users` lookup moved from `LookupRepository` into `AppUserRepository`.
+The hex hash format is an assumption — no legacy hashes were available to compare.
+
+Totals now **149 xUnit + 176 Karma** tests passing; `ng build` succeeds (initial bundle
+exceeds the 500 kB budget warning — PrimeNG shared chunks — not an error).
+CourseGroup / Course / AppUser are **uncommitted** in the working tree as of 2026-09-07.
+
+**Not yet built:** everything else in `course.sql` / `promotion.sql` (Certification,
+JobCategory, CourseFAQ, CourseRelatedLink, HotCourse, CourseRecomm, LinkDefinition,
+PartnerCourseGroup, TrainingCenter, Seminar, Promotion2, FeaturedPromoItem). Certification
+and JobCategory lookups are already served from `LookupRepository`.
 
 **Build gotcha:** if `dotnet build` fails with MSB3027 on `CMS.API.exe`, the API is
 running from `bin\` (e.g. `dotnet run` in another terminal). Don't kill it blindly —

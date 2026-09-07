@@ -19,6 +19,26 @@ export class LookupService {
     return this.http.get<LookupItem[]>(`${this.baseUrl}/partners`);
   }
 
+  /** pkid = CourseGroup.pkid, label = Description; ordered by Description. */
+  courseGroups(): Observable<LookupItem[]> {
+    return this.http.get<LookupItem[]>(`${this.baseUrl}/course-groups`);
+  }
+
+  /** pkid = Course.pkid, label = "CourseId Title"; ordered by CourseId. */
+  courses(): Observable<LookupItem[]> {
+    return this.http.get<LookupItem[]>(`${this.baseUrl}/courses`);
+  }
+
+  /** pkid = Certification.pkid, label = "Partner.Name Title"; ordered by partner then title. */
+  certifications(): Observable<LookupItem[]> {
+    return this.http.get<LookupItem[]>(`${this.baseUrl}/certifications`);
+  }
+
+  /** pkid = JobCategory.pkid, label = Description; ordered by Description. */
+  jobCategories(): Observable<LookupItem[]> {
+    return this.http.get<LookupItem[]>(`${this.baseUrl}/job-categories`);
+  }
+
   /** id = RoleId, label = RoleName. */
   appRoles(): Observable<StringLookupItem[]> {
     return this.http.get<StringLookupItem[]>(`${this.baseUrl}/app-roles`);

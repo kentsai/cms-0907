@@ -15,6 +15,9 @@ public class LookupsController(
     IPublishStatusRepository publishStatuses,
     IAppRoleRepository appRoles,
     IPartnerRepository partners,
+    ICourseGroupRepository courseGroups,
+    ICourseRepository courses,
+    IAppUserRepository appUsers,
     ILookupRepository lookups) : ControllerBase
 {
     [HttpGet("publish-statuses")]
@@ -31,6 +34,13 @@ public class LookupsController(
         return Ok(await appRoles.GetLookupAsync(cancellationToken));
     }
 
+    [HttpGet("app-users")]
+    [ProducesResponseType<IReadOnlyList<StringLookupItem>>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<StringLookupItem>>> AppUsers(CancellationToken cancellationToken)
+    {
+        return Ok(await appUsers.GetLookupAsync(cancellationToken));
+    }
+
     [HttpGet("partners")]
     [ProducesResponseType<IReadOnlyList<LookupItem>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyList<LookupItem>>> Partners(CancellationToken cancellationToken)
@@ -38,10 +48,31 @@ public class LookupsController(
         return Ok(await partners.GetLookupAsync(cancellationToken));
     }
 
-    [HttpGet("app-users")]
-    [ProducesResponseType<IReadOnlyList<StringLookupItem>>(StatusCodes.Status200OK)]
-    public async Task<ActionResult<IReadOnlyList<StringLookupItem>>> AppUsers(CancellationToken cancellationToken)
+    [HttpGet("course-groups")]
+    [ProducesResponseType<IReadOnlyList<LookupItem>>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<LookupItem>>> CourseGroups(CancellationToken cancellationToken)
     {
-        return Ok(await lookups.GetAppUsersAsync(cancellationToken));
+        return Ok(await courseGroups.GetLookupAsync(cancellationToken));
+    }
+
+    [HttpGet("courses")]
+    [ProducesResponseType<IReadOnlyList<LookupItem>>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<LookupItem>>> Courses(CancellationToken cancellationToken)
+    {
+        return Ok(await courses.GetLookupAsync(cancellationToken));
+    }
+
+    [HttpGet("certifications")]
+    [ProducesResponseType<IReadOnlyList<LookupItem>>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<LookupItem>>> Certifications(CancellationToken cancellationToken)
+    {
+        return Ok(await lookups.GetCertificationsAsync(cancellationToken));
+    }
+
+    [HttpGet("job-categories")]
+    [ProducesResponseType<IReadOnlyList<LookupItem>>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<LookupItem>>> JobCategories(CancellationToken cancellationToken)
+    {
+        return Ok(await lookups.GetJobCategoriesAsync(cancellationToken));
     }
 }

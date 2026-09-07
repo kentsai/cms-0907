@@ -1,0 +1,125 @@
+using CMS.API.Infrastructure;
+using CMS.API.Models;
+using CMS.API.Repositories;
+using Microsoft.AspNetCore.Mvc;
+
+namespace CMS.API.Controllers;
+
+/// <summary>
+/// String-keyed entity: <c>{id}</c> is <c>UserId</c>, so routes carry no <c>:int</c> constraint.
+/// The password hash never crosses this boundary — creation seeds it from the system default and
+/// <see cref="ResetPassword"/> is the only way to change it.
+/// </summary>
+[ApiController]
+[Route("api/app-users")]
+[Produces("application/json")]
+public class AppUsersController(IAppUserRepository repository) : ControllerBase
+{
+    private const string AppConfigErrorTitle = "系統設定錯誤";
+
+    [HttpGet]
+    [ProducesResponseType<IReadOnlyList<AppUser>>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<AppUser>>> GetAll(CancellationToken cancellationToken)
+    {
+        return Ok(await repository.GetAllAsync(cancellationToken));
+    }
+
+    [HttpPost("query")]
+    [ProducesResponseType<IReadOnlyList<AppUser>>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<AppUser>>> Query([FromBody] AppUserQuery query, CancellationToken cancellationToken)
+    {
+        return Ok(await repository.QueryAsync(query, cancellationToken));
+    }
+
+    [HttpGet("{id}")]
+    [ProducesResponseType<AppUser>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<AppUser>> GetById(string id, CancellationToken cancellationToken)
+    {
+        var item = await repository.GetByIdAsync(id, cancellationToken);
+        return item is null ? NotFound() : Ok(item);
+    }
+
+    [HttpPost]
+    [ProducesResponseType<AppUser>(StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<ActionResult<AppUser>> Create([FromBody] AppUserRequest request, CancellationToken cancellationToken)
+    {
+        request.UserId = request.UserId.Trim();
+        if (await repository.ExistsAsync(request.UserId, cancellationToken))
+        {
+            return Conflict(new { message = $"使用者代碼「{request.UserId}」已存在。" });
+        }
+
+        int pkid;
+        try
+        {
+            pkid = await repository.CreateAsync(request, cancellationToken);
+        }
+        catch (AppConfigException ex)
+        {
+            return Problem(detail: ex.Message, title: AppConfigErrorTitle, statusCode: StatusCodes.Status500InternalServerError);
+        }
+
+        var created = new AppUser
+        {
+            Pkid = pkid,
+            UserId = request.UserId,
+            UserName = request.UserName,
+            IsActive = request.IsActive,
+            PasswordUpdatedTime = DateTime.UtcNow,
+            RoleCount = request.RoleIds.Count,
+            RoleIds = request.RoleIds
+        };
+
+        return CreatedAtAction(nameof(GetById), new { id = request.UserId }, created);
+    }
+
+    [HttpPut]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Update([FromBody] AppUserRequest request, CancellationToken cancellationToken)
+    {
+        request.UserId = request.UserId.Trim();
+        var updated = await repository.UpdateAsync(request, cancellationToken);
+        return updated ? NoContent() : NotFound();
+    }
+
+    [HttpDelete("{id}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Delete(string id, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var deleted = await repository.DeleteAsync(id, cancellationToken);
+            return deleted ? NoContent() : NotFound();
+        }
+        catch (EntityInUseException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
+    }
+
+    /// <summary>Resets the user's password to the system default (<c>SysConfig.appConfig.defaultPassword</c>).</summary>
+    [HttpPost("{id}/reset-password")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> ResetPassword(string id, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var reset = await repository.ResetPasswordAsync(id, cancellationToken);
+            return reset ? NoContent() : NotFound();
+        }
+        catch (AppConfigException ex)
+        {
+            return Problem(detail: ex.Message, title: AppConfigErrorTitle, statusCode: StatusCodes.Status500InternalServerError);
+        }
+    }
+}

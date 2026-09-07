@@ -11,12 +11,17 @@ public class LookupsControllerTests
     private readonly Mock<IPublishStatusRepository> _publishStatuses = new(MockBehavior.Strict);
     private readonly Mock<IAppRoleRepository> _appRoles = new(MockBehavior.Strict);
     private readonly Mock<IPartnerRepository> _partners = new(MockBehavior.Strict);
+    private readonly Mock<ICourseGroupRepository> _courseGroups = new(MockBehavior.Strict);
+    private readonly Mock<ICourseRepository> _courses = new(MockBehavior.Strict);
+    private readonly Mock<IAppUserRepository> _appUsers = new(MockBehavior.Strict);
     private readonly Mock<ILookupRepository> _lookups = new(MockBehavior.Strict);
     private readonly LookupsController _controller;
 
     public LookupsControllerTests()
     {
-        _controller = new LookupsController(_publishStatuses.Object, _appRoles.Object, _partners.Object, _lookups.Object);
+        _controller = new LookupsController(
+            _publishStatuses.Object, _appRoles.Object, _partners.Object, _courseGroups.Object,
+            _courses.Object, _appUsers.Object, _lookups.Object);
     }
 
     [Fact]
@@ -55,6 +60,23 @@ public class LookupsControllerTests
     }
 
     [Fact]
+    public async Task AppUsers_ReturnsOk_WithStringKeyedItems_FromAppUserRepository()
+    {
+        var expected = new List<StringLookupItem>
+        {
+            new() { Id = "helen", Label = "helen (helen)" }
+        };
+        _appUsers.Setup(r => r.GetLookupAsync(It.IsAny<CancellationToken>())).ReturnsAsync(expected);
+
+        var result = await _controller.AppUsers(CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var items = Assert.IsAssignableFrom<IReadOnlyList<StringLookupItem>>(ok.Value);
+        Assert.Single(items);
+        Assert.Equal("helen (helen)", items[0].Label);
+    }
+
+    [Fact]
     public async Task Partners_ReturnsOk_WithLookupItems()
     {
         var expected = new List<LookupItem>
@@ -73,19 +95,72 @@ public class LookupsControllerTests
     }
 
     [Fact]
-    public async Task AppUsers_ReturnsOk_WithStringKeyedItems()
+    public async Task CourseGroups_ReturnsOk_WithLookupItems()
     {
-        var expected = new List<StringLookupItem>
+        var expected = new List<LookupItem>
         {
-            new() { Id = "helen", Label = "helen (helen)" }
+            new() { Pkid = 1, Label = "雲端" },
+            new() { Pkid = 2, Label = "資安" }
         };
-        _lookups.Setup(r => r.GetAppUsersAsync(It.IsAny<CancellationToken>())).ReturnsAsync(expected);
+        _courseGroups.Setup(r => r.GetLookupAsync(It.IsAny<CancellationToken>())).ReturnsAsync(expected);
 
-        var result = await _controller.AppUsers(CancellationToken.None);
+        var result = await _controller.CourseGroups(CancellationToken.None);
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);
-        var items = Assert.IsAssignableFrom<IReadOnlyList<StringLookupItem>>(ok.Value);
+        var items = Assert.IsAssignableFrom<IReadOnlyList<LookupItem>>(ok.Value);
+        Assert.Equal(2, items.Count);
+        Assert.Equal("雲端", items[0].Label);
+    }
+
+    [Fact]
+    public async Task Courses_ReturnsOk_WithLookupItems()
+    {
+        var expected = new List<LookupItem>
+        {
+            new() { Pkid = 10, Label = "AZ-104 Azure Administrator" }
+        };
+        _courses.Setup(r => r.GetLookupAsync(It.IsAny<CancellationToken>())).ReturnsAsync(expected);
+
+        var result = await _controller.Courses(CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var items = Assert.IsAssignableFrom<IReadOnlyList<LookupItem>>(ok.Value);
         Assert.Single(items);
-        Assert.Equal("helen (helen)", items[0].Label);
+        Assert.Equal("AZ-104 Azure Administrator", items[0].Label);
+    }
+
+    [Fact]
+    public async Task Certifications_ReturnsOk_WithLookupItems()
+    {
+        var expected = new List<LookupItem>
+        {
+            new() { Pkid = 1, Label = "Microsoft Azure Administrator Associate" }
+        };
+        _lookups.Setup(r => r.GetCertificationsAsync(It.IsAny<CancellationToken>())).ReturnsAsync(expected);
+
+        var result = await _controller.Certifications(CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var items = Assert.IsAssignableFrom<IReadOnlyList<LookupItem>>(ok.Value);
+        Assert.Single(items);
+        Assert.Equal(1, items[0].Pkid);
+    }
+
+    [Fact]
+    public async Task JobCategories_ReturnsOk_WithLookupItems()
+    {
+        var expected = new List<LookupItem>
+        {
+            new() { Pkid = 1, Label = "系統管理" },
+            new() { Pkid = 2, Label = "軟體開發" }
+        };
+        _lookups.Setup(r => r.GetJobCategoriesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(expected);
+
+        var result = await _controller.JobCategories(CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var items = Assert.IsAssignableFrom<IReadOnlyList<LookupItem>>(ok.Value);
+        Assert.Equal(2, items.Count);
+        Assert.Equal("軟體開發", items[1].Label);
     }
 }

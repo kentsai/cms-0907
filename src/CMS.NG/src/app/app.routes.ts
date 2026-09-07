@@ -2,6 +2,36 @@ import { Routes } from '@angular/router';
 
 export const routes: Routes = [
   {
+    path: 'admin/app-users',
+    children: [
+      {
+        path: '',
+        loadComponent: () =>
+          import('@features/app-users/app-user-list/app-user-list.component')
+            .then(m => m.AppUserListComponent)
+      },
+      // `new` must precede `:id` so it is not captured as a UserId.
+      {
+        path: 'new',
+        loadComponent: () =>
+          import('@features/app-users/app-user-form/app-user-form.component')
+            .then(m => m.AppUserFormComponent)
+      },
+      {
+        path: ':id',
+        loadComponent: () =>
+          import('@features/app-users/app-user-detail/app-user-detail.component')
+            .then(m => m.AppUserDetailComponent)
+      },
+      {
+        path: ':id/edit',
+        loadComponent: () =>
+          import('@features/app-users/app-user-form/app-user-form.component')
+            .then(m => m.AppUserFormComponent)
+      }
+    ]
+  },
+  {
     path: 'admin/app-roles',
     children: [
       {
@@ -88,6 +118,66 @@ export const routes: Routes = [
         loadComponent: () =>
           import('@features/partners/partner-form/partner-form.component')
             .then(m => m.PartnerFormComponent)
+      }
+    ]
+  },
+  {
+    path: 'course/course-groups',
+    children: [
+      {
+        path: '',
+        loadComponent: () =>
+          import('@features/course-groups/course-group-list/course-group-list.component')
+            .then(m => m.CourseGroupListComponent)
+      },
+      // `new` must precede `:id` so it is not captured as an id.
+      {
+        path: 'new',
+        loadComponent: () =>
+          import('@features/course-groups/course-group-form/course-group-form.component')
+            .then(m => m.CourseGroupFormComponent)
+      },
+      {
+        path: ':id',
+        loadComponent: () =>
+          import('@features/course-groups/course-group-detail/course-group-detail.component')
+            .then(m => m.CourseGroupDetailComponent)
+      },
+      {
+        path: ':id/edit',
+        loadComponent: () =>
+          import('@features/course-groups/course-group-form/course-group-form.component')
+            .then(m => m.CourseGroupFormComponent)
+      }
+    ]
+  },
+  {
+    path: 'course/courses',
+    children: [
+      {
+        path: '',
+        loadComponent: () =>
+          import('@features/courses/course-list/course-list.component')
+            .then(m => m.CourseListComponent)
+      },
+      // `new` must precede `:id` so it is not captured as an id.
+      {
+        path: 'new',
+        loadComponent: () =>
+          import('@features/courses/course-form/course-form.component')
+            .then(m => m.CourseFormComponent)
+      },
+      {
+        path: ':id',
+        loadComponent: () =>
+          import('@features/courses/course-detail/course-detail.component')
+            .then(m => m.CourseDetailComponent)
+      },
+      {
+        path: ':id/edit',
+        loadComponent: () =>
+          import('@features/courses/course-form/course-form.component')
+            .then(m => m.CourseFormComponent)
       }
     ]
   }

@@ -28,6 +28,11 @@ export class App {
           routerLink: '/admin/app-roles'
         },
         {
+          label: '使用者 AppUser',
+          icon: 'pi pi-user',
+          routerLink: '/admin/app-users'
+        },
+        {
           label: '發布狀態 PublishStatus',
           icon: 'pi pi-flag',
           routerLink: '/admin/publish-statuses'
@@ -43,6 +48,16 @@ export class App {
           label: '合作夥伴 Partner',
           icon: 'pi pi-building',
           routerLink: '/course/partners'
+        },
+        {
+          label: '課程群組 CourseGroup',
+          icon: 'pi pi-folder',
+          routerLink: '/course/course-groups'
+        },
+        {
+          label: '課程 Course',
+          icon: 'pi pi-graduation-cap',
+          routerLink: '/course/courses'
         }
       ]
     }

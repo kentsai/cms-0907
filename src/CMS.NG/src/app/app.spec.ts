@@ -33,6 +33,14 @@ describe('App', () => {
     expect(sidebarText).toContain('系統管理 Admin');
   });
 
+  it('should list AppUser under the Admin menu group', () => {
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+
+    const sidebarText = (fixture.nativeElement as HTMLElement).querySelector('.app-sidebar')?.textContent ?? '';
+    expect(sidebarText).toContain('使用者 AppUser');
+  });
+
   it('should list PublishStatus under the Admin menu group', () => {
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
@@ -48,6 +56,22 @@ describe('App', () => {
     const sidebarText = (fixture.nativeElement as HTMLElement).querySelector('.app-sidebar')?.textContent ?? '';
     expect(sidebarText).toContain('課程管理 Course');
     expect(sidebarText).toContain('合作夥伴 Partner');
+  });
+
+  it('should list CourseGroup under the Course menu group', () => {
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+
+    const sidebarText = (fixture.nativeElement as HTMLElement).querySelector('.app-sidebar')?.textContent ?? '';
+    expect(sidebarText).toContain('課程群組 CourseGroup');
+  });
+
+  it('should list Course under the Course menu group', () => {
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+
+    const sidebarText = (fixture.nativeElement as HTMLElement).querySelector('.app-sidebar')?.textContent ?? '';
+    expect(sidebarText).toContain('課程 Course');
   });
 
   it('should toggle the sidebar collapsed state', () => {
