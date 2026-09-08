@@ -1,4 +1,4 @@
-import { addYears, fromIso, toIso } from './date.util';
+import { addDays, addYears, formatMonthDay, formatMonthDayWeekday, fromIso, startOfWeek, toIso } from './date.util';
 
 describe('date.util', () => {
   it('toIso uses local date components and zero-pads', () => {
@@ -39,5 +39,27 @@ describe('date.util', () => {
     expect(later.getMonth()).toBe(2);
     expect(later.getDate()).toBe(15);
     expect(start.getFullYear()).toBe(2026);
+  });
+
+  it('addDays shifts across month boundaries and returns local midnight', () => {
+    const shifted = addDays(new Date(2026, 2, 30, 15, 30), 3);
+
+    expect(toIso(shifted)).toBe('2026-04-02');
+    expect(shifted.getHours()).toBe(0);
+    expect(toIso(addDays(new Date(2026, 0, 1), -1))).toBe('2025-12-31');
+  });
+
+  it('startOfWeek snaps every day of the week to its Monday (Sunday goes back six days)', () => {
+    // 2026-03-16 is a Monday.
+    for (let day = 16; day <= 22; day++) {
+      expect(toIso(startOfWeek(new Date(2026, 2, day)))).toBe('2026-03-16');
+    }
+    expect(toIso(startOfWeek(new Date(2026, 2, 23)))).toBe('2026-03-23');
+  });
+
+  it('formatMonthDay and formatMonthDayWeekday match the board headers', () => {
+    expect(formatMonthDay(new Date(2026, 2, 16))).toBe('3/16');
+    expect(formatMonthDayWeekday(new Date(2026, 2, 16))).toBe('3/16 (一)');
+    expect(formatMonthDayWeekday(new Date(2026, 2, 22))).toBe('3/22 (日)');
   });
 });

@@ -74,6 +74,23 @@ describe('App', () => {
     expect(sidebarText).toContain('課程 Course');
   });
 
+  it('should list FeaturedPromoItem under the Home menu group', () => {
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+
+    const sidebarText = (fixture.nativeElement as HTMLElement).querySelector('.app-sidebar')?.textContent ?? '';
+    expect(sidebarText).toContain('首頁 Home');
+    expect(sidebarText).toContain('上稿作業 FeaturedPromoItem');
+  });
+
+  it('should list Certification under the Course menu group', () => {
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+
+    const sidebarText = (fixture.nativeElement as HTMLElement).querySelector('.app-sidebar')?.textContent ?? '';
+    expect(sidebarText).toContain('認證 Certification');
+  });
+
   it('should toggle the sidebar collapsed state', () => {
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();

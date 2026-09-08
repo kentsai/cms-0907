@@ -18,6 +18,18 @@ export class App {
 
   protected readonly menuItems: MenuItem[] = [
     {
+      label: '首頁 Home',
+      icon: 'pi pi-home',
+      expanded: true,
+      items: [
+        {
+          label: '上稿作業 FeaturedPromoItem',
+          icon: 'pi pi-calendar',
+          routerLink: '/home/featured-promo-items'
+        }
+      ]
+    },
+    {
       label: '系統管理 Admin',
       icon: 'pi pi-cog',
       expanded: true,
@@ -58,6 +70,11 @@ export class App {
           label: '課程 Course',
           icon: 'pi pi-graduation-cap',
           routerLink: '/course/courses'
+        },
+        {
+          label: '認證 Certification',
+          icon: 'pi pi-verified',
+          routerLink: '/course/certifications'
         }
       ]
     }

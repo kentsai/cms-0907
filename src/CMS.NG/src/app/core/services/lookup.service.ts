@@ -1,8 +1,8 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '@environments/environment';
-import { LookupItem, StringLookupItem } from '@core/models/lookup-item.model';
+import { LookupItem, PromotionLookupItem, StringLookupItem } from '@core/models/lookup-item.model';
 
 /** One method per /api/lookups/* endpoint. Used by FK dropdowns in list filters and forms. */
 @Injectable({ providedIn: 'root' })
@@ -37,6 +37,20 @@ export class LookupService {
   /** pkid = JobCategory.pkid, label = Description; ordered by Description. */
   jobCategories(): Observable<LookupItem[]> {
     return this.http.get<LookupItem[]>(`${this.baseUrl}/job-categories`);
+  }
+
+  /** pkid = TrainingCenter.pkid, label = Name; ordered by DisplayOrder then Name. */
+  trainingCenters(): Observable<LookupItem[]> {
+    return this.http.get<LookupItem[]>(`${this.baseUrl}/training-centers`);
+  }
+
+  /** Promotions whose PromoCode contains `keyword` (newest first, capped server-side). Blank keyword = newest codes. */
+  promotions(keyword: string | null | undefined): Observable<PromotionLookupItem[]> {
+    let params = new HttpParams();
+    if (keyword?.trim()) {
+      params = params.set('keyword', keyword.trim());
+    }
+    return this.http.get<PromotionLookupItem[]>(`${this.baseUrl}/promotions`, { params });
   }
 
   /** id = RoleId, label = RoleName. */

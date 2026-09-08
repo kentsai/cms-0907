@@ -9,3 +9,11 @@ export interface StringLookupItem {
   id: string;
   label: string;
 }
+
+/** Row of the PromoCode search (/api/lookups/promotions?keyword=); carries the promotion's own text for pre-fill. */
+export interface PromotionLookupItem {
+  pkid: number;
+  promoCode: string;
+  topic: string;
+  description: string;
+}

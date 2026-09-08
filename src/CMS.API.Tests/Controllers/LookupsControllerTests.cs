@@ -14,6 +14,7 @@ public class LookupsControllerTests
     private readonly Mock<ICourseGroupRepository> _courseGroups = new(MockBehavior.Strict);
     private readonly Mock<ICourseRepository> _courses = new(MockBehavior.Strict);
     private readonly Mock<IAppUserRepository> _appUsers = new(MockBehavior.Strict);
+    private readonly Mock<ICertificationRepository> _certifications = new(MockBehavior.Strict);
     private readonly Mock<ILookupRepository> _lookups = new(MockBehavior.Strict);
     private readonly LookupsController _controller;
 
@@ -21,7 +22,7 @@ public class LookupsControllerTests
     {
         _controller = new LookupsController(
             _publishStatuses.Object, _appRoles.Object, _partners.Object, _courseGroups.Object,
-            _courses.Object, _appUsers.Object, _lookups.Object);
+            _courses.Object, _appUsers.Object, _certifications.Object, _lookups.Object);
     }
 
     [Fact]
@@ -130,13 +131,13 @@ public class LookupsControllerTests
     }
 
     [Fact]
-    public async Task Certifications_ReturnsOk_WithLookupItems()
+    public async Task Certifications_ReturnsOk_WithLookupItems_FromCertificationRepository()
     {
         var expected = new List<LookupItem>
         {
             new() { Pkid = 1, Label = "Microsoft Azure Administrator Associate" }
         };
-        _lookups.Setup(r => r.GetCertificationsAsync(It.IsAny<CancellationToken>())).ReturnsAsync(expected);
+        _certifications.Setup(r => r.GetLookupAsync(It.IsAny<CancellationToken>())).ReturnsAsync(expected);
 
         var result = await _controller.Certifications(CancellationToken.None);
 
@@ -162,5 +163,55 @@ public class LookupsControllerTests
         var items = Assert.IsAssignableFrom<IReadOnlyList<LookupItem>>(ok.Value);
         Assert.Equal(2, items.Count);
         Assert.Equal("軟體開發", items[1].Label);
+    }
+
+    [Fact]
+    public async Task TrainingCenters_ReturnsOk_WithLookupItems()
+    {
+        var expected = new List<LookupItem>
+        {
+            new() { Pkid = 1, Label = "台北" },
+            new() { Pkid = 2, Label = "新竹" }
+        };
+        _lookups.Setup(r => r.GetTrainingCentersAsync(It.IsAny<CancellationToken>())).ReturnsAsync(expected);
+
+        var result = await _controller.TrainingCenters(CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var items = Assert.IsAssignableFrom<IReadOnlyList<LookupItem>>(ok.Value);
+        Assert.Equal(2, items.Count);
+        Assert.Equal("台北", items[0].Label);
+    }
+
+    [Fact]
+    public async Task Promotions_PassesKeywordAndLimit_AndReturnsPromoCodeRows()
+    {
+        var expected = new List<PromotionLookupItem>
+        {
+            new() { Pkid = 50, PromoCode = "20251204_SkillTrainAI", Topic = "成為能AI協作的程式設計師", Description = "轉職就業養成班" }
+        };
+        _lookups.Setup(r => r.SearchPromotionsAsync("Skill", LookupsController.PromotionLookupLimit, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(expected);
+
+        var result = await _controller.Promotions("Skill", CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var items = Assert.IsAssignableFrom<IReadOnlyList<PromotionLookupItem>>(ok.Value);
+        Assert.Single(items);
+        Assert.Equal(50, items[0].Pkid);
+        Assert.Equal("20251204_SkillTrainAI", items[0].PromoCode);
+        _lookups.Verify(r => r.SearchPromotionsAsync("Skill", LookupsController.PromotionLookupLimit, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Promotions_PassesNullKeywordThrough_WhenOmitted()
+    {
+        _lookups.Setup(r => r.SearchPromotionsAsync(null, LookupsController.PromotionLookupLimit, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+
+        var result = await _controller.Promotions(null, CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        Assert.Empty(Assert.IsAssignableFrom<IReadOnlyList<PromotionLookupItem>>(ok.Value));
     }
 }

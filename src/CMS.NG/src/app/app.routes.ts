@@ -2,6 +2,13 @@ import { Routes } from '@angular/router';
 
 export const routes: Routes = [
   {
+    // Weekly board with inline edit — a single page, no detail / form routes.
+    path: 'home/featured-promo-items',
+    loadComponent: () =>
+      import('@features/featured-promo-items/featured-promo-list/featured-promo-list.component')
+        .then(m => m.FeaturedPromoListComponent)
+  },
+  {
     path: 'admin/app-users',
     children: [
       {
@@ -178,6 +185,36 @@ export const routes: Routes = [
         loadComponent: () =>
           import('@features/courses/course-form/course-form.component')
             .then(m => m.CourseFormComponent)
+      }
+    ]
+  },
+  {
+    path: 'course/certifications',
+    children: [
+      {
+        path: '',
+        loadComponent: () =>
+          import('@features/certifications/certification-list/certification-list.component')
+            .then(m => m.CertificationListComponent)
+      },
+      // `new` must precede `:id` so it is not captured as an id.
+      {
+        path: 'new',
+        loadComponent: () =>
+          import('@features/certifications/certification-form/certification-form.component')
+            .then(m => m.CertificationFormComponent)
+      },
+      {
+        path: ':id',
+        loadComponent: () =>
+          import('@features/certifications/certification-detail/certification-detail.component')
+            .then(m => m.CertificationDetailComponent)
+      },
+      {
+        path: ':id/edit',
+        loadComponent: () =>
+          import('@features/certifications/certification-form/certification-form.component')
+            .then(m => m.CertificationFormComponent)
       }
     ]
   }

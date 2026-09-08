@@ -18,8 +18,12 @@ public class LookupsController(
     ICourseGroupRepository courseGroups,
     ICourseRepository courses,
     IAppUserRepository appUsers,
+    ICertificationRepository certifications,
     ILookupRepository lookups) : ControllerBase
 {
+    /// <summary>Cap on PromoCode search results.</summary>
+    public const int PromotionLookupLimit = 20;
+
     [HttpGet("publish-statuses")]
     [ProducesResponseType<IReadOnlyList<LookupItem>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyList<LookupItem>>> PublishStatuses(CancellationToken cancellationToken)
@@ -66,7 +70,7 @@ public class LookupsController(
     [ProducesResponseType<IReadOnlyList<LookupItem>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyList<LookupItem>>> Certifications(CancellationToken cancellationToken)
     {
-        return Ok(await lookups.GetCertificationsAsync(cancellationToken));
+        return Ok(await certifications.GetLookupAsync(cancellationToken));
     }
 
     [HttpGet("job-categories")]
@@ -74,5 +78,21 @@ public class LookupsController(
     public async Task<ActionResult<IReadOnlyList<LookupItem>>> JobCategories(CancellationToken cancellationToken)
     {
         return Ok(await lookups.GetJobCategoriesAsync(cancellationToken));
+    }
+
+    [HttpGet("training-centers")]
+    [ProducesResponseType<IReadOnlyList<LookupItem>>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<LookupItem>>> TrainingCenters(CancellationToken cancellationToken)
+    {
+        return Ok(await lookups.GetTrainingCentersAsync(cancellationToken));
+    }
+
+    /// <summary>PromoCode search for the FeaturedPromoItem form. Blank keyword returns the newest codes.</summary>
+    [HttpGet("promotions")]
+    [ProducesResponseType<IReadOnlyList<PromotionLookupItem>>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<PromotionLookupItem>>> Promotions(
+        [FromQuery] string? keyword, CancellationToken cancellationToken)
+    {
+        return Ok(await lookups.SearchPromotionsAsync(keyword, PromotionLookupLimit, cancellationToken));
     }
 }

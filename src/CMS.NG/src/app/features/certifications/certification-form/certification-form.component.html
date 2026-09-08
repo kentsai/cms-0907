@@ -1,0 +1,89 @@
+<form [formGroup]="form" (ngSubmit)="save()" novalidate>
+  <p-toolbar styleClass="page-toolbar">
+    <ng-template #start>
+      <div class="toolbar-title">
+        <h1>{{ title }}</h1>
+        @if (isEdit && pkid !== null) {
+          <span class="toolbar-title__sub">主代碼 {{ pkid }}</span>
+          <app-row-audit-badge tableName="Certification" [pk]="pkid" />
+        }
+      </div>
+    </ng-template>
+    <ng-template #end>
+      <div class="toolbar-actions">
+        <p-button label="取消" icon="pi pi-times" severity="secondary" type="button" (onClick)="cancel()" />
+        <p-button label="儲存" icon="pi pi-check" severity="success" type="submit" [loading]="saving()" [disabled]="form.invalid || saving() || loading()" />
+      </div>
+    </ng-template>
+  </p-toolbar>
+
+  <p-card header="基本資料" styleClass="form-card">
+    <div class="form-grid">
+      <div class="field">
+        <label for="partnerPkid">原廠 <span class="required">*</span></label>
+        <p-select
+          inputId="partnerPkid"
+          formControlName="partnerPkid"
+          [options]="partners()"
+          optionLabel="label"
+          optionValue="pkid"
+          [filter]="true"
+          filterBy="label"
+          placeholder="請選擇原廠"
+          appendTo="body"
+          styleClass="w-full" />
+        @if (isInvalid('partnerPkid')) {
+          <small class="error">請選擇原廠</small>
+        }
+      </div>
+
+      <div class="field">
+        <label for="title">認證名稱</label>
+        <input id="title" pInputText formControlName="title" maxlength="100" placeholder="選填" autocomplete="off" />
+        @if (isInvalid('title')) {
+          <small class="error">認證名稱最多 100 字</small>
+        }
+      </div>
+    </div>
+  </p-card>
+
+  <p-card header="課程與職務類別" styleClass="form-card">
+    <div class="form-grid form-grid--stack">
+      <div class="field">
+        <label for="coursePkids">對應課程</label>
+        <p-multiselect
+          inputId="coursePkids"
+          formControlName="coursePkids"
+          [options]="courses()"
+          optionLabel="label"
+          optionValue="pkid"
+          [filter]="true"
+          filterBy="label"
+          [virtualScroll]="true"
+          [virtualScrollItemSize]="43"
+          [maxSelectedLabels]="9999"
+          display="chip"
+          placeholder="選擇課程（可複選）"
+          appendTo="body"
+          styleClass="w-full chip-select" />
+      </div>
+
+      <div class="field">
+        <label for="jobCategoryPkids">職務類別</label>
+        <p-multiselect
+          inputId="jobCategoryPkids"
+          formControlName="jobCategoryPkids"
+          [options]="jobCategories()"
+          optionLabel="label"
+          optionValue="pkid"
+          [filter]="true"
+          filterBy="label"
+          [maxSelectedLabels]="9999"
+          display="chip"
+          placeholder="選擇職務類別（可複選）"
+          appendTo="body"
+          styleClass="w-full chip-select" />
+      </div>
+    </div>
+  </p-card>
+</form>

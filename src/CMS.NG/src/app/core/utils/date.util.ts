@@ -33,3 +33,27 @@ export function addYears(value: Date, years: number): Date {
   result.setFullYear(result.getFullYear() + years);
   return result;
 }
+
+/** Returns a new local-midnight `Date` shifted by `days`. */
+export function addDays(value: Date, days: number): Date {
+  return new Date(value.getFullYear(), value.getMonth(), value.getDate() + days);
+}
+
+/** Monday (local midnight) of the week that contains `value`; Sunday belongs to the preceding Monday. */
+export function startOfWeek(value: Date): Date {
+  const offsetFromMonday = (value.getDay() + 6) % 7;
+  return addDays(value, -offsetFromMonday);
+}
+
+/** Traditional Chinese weekday characters indexed by `Date.getDay()` (Sunday = 0). */
+export const WEEKDAY_ZH: readonly string[] = ['日', '一', '二', '三', '四', '五', '六'];
+
+/** `'M/d'` without zero padding, e.g. `3/16`. */
+export function formatMonthDay(value: Date): string {
+  return `${value.getMonth() + 1}/${value.getDate()}`;
+}
+
+/** `'M/d (一)'` — the day header used by the weekly boards. */
+export function formatMonthDayWeekday(value: Date): string {
+  return `${formatMonthDay(value)} (${WEEKDAY_ZH[value.getDay()]})`;
+}

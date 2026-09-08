@@ -1,0 +1,88 @@
+<div class="page">
+  <header class="page-header">
+    <div class="page-header__title">
+      <h1>上稿作業 FeaturedPromoItem</h1>
+      <span class="page-header__subtitle">首頁促銷版位（每日三格）</span>
+    </div>
+    <div class="page-header__actions">
+      @if (clipboard(); as clip) {
+        <span class="clipboard" pTooltip="可在空白版位貼上" tooltipPosition="bottom">
+          <i class="pi pi-clipboard"></i> 已複製「{{ clip.promoCode }}」
+        </span>
+      }
+    </div>
+  </header>
+
+  <section class="page-body">
+    <p-tabs [value]="selectedCenter() ?? ''" (valueChange)="onTabChange($event)" class="center-tabs">
+      <p-tablist>
+        @for (center of trainingCenters(); track center.pkid) {
+          <p-tab [value]="center.pkid">{{ center.label }}</p-tab>
+        }
+      </p-tablist>
+    </p-tabs>
+
+    <div class="week-nav">
+      <p-button icon="pi pi-angle-double-left" label="上一週" severity="secondary" [text]="true" size="small" (onClick)="previousWeek()" />
+      <span class="week-nav__label">{{ weekLabel() }}</span>
+      <p-button icon="pi pi-angle-double-right" iconPos="right" label="下一週" severity="secondary" [text]="true" size="small" (onClick)="nextWeek()" />
+      <p-button label="本週" severity="secondary" [outlined]="true" size="small" (onClick)="thisWeek()" />
+      @if (loading()) {
+        <span class="week-nav__loading">載入中…</span>
+      }
+    </div>
+
+    @if (trainingCenters().length === 0) {
+      <p class="empty">尚無訓練中心資料。</p>
+    }
+
+    @for (day of days(); track day.iso) {
+      <section class="day" [attr.data-day]="day.iso">
+        <h2 class="day__header">{{ day.label }}</h2>
+
+        @for (cell of day.slots; track cell.slot) {
+          @if (isEditing(day, cell)) {
+            <div class="row row--editing">
+              <span class="row__slot">{{ cell.slot }}</span>
+              <div class="row__form">
+                <app-featured-promo-form
+                  [scheduleOn]="day.iso"
+                  [trainingCenterPkid]="selectedCenter()!"
+                  [slot]="cell.slot"
+                  [item]="editing()!.item"
+                  [initial]="editing()!.initial"
+                  (saved)="onSaved()"
+                  (cancelled)="onCancelled()" />
+              </div>
+            </div>
+          } @else if (cell.item; as item) {
+            <div class="row row--filled">
+              <span class="row__slot">{{ cell.slot }}</span>
+              <span class="row__actions">
+                <p-button icon="pi pi-arrow-up" [text]="true" [rounded]="true" size="small" pTooltip="上移" tooltipPosition="top" [disabled]="cell.slot <= minSlot" (onClick)="moveUp(item)" />
+                <p-button icon="pi pi-arrow-down" [text]="true" [rounded]="true" size="small" pTooltip="下移" tooltipPosition="top" [disabled]="cell.slot >= maxSlot" (onClick)="moveDown(item)" />
+                <p-button icon="pi pi-pencil" [text]="true" [rounded]="true" size="small" pTooltip="編輯" tooltipPosition="top" (onClick)="startEdit(day, cell)" />
+                <p-button icon="pi pi-copy" [text]="true" [rounded]="true" size="small" pTooltip="複製" tooltipPosition="top" (onClick)="copy(item)" />
+                <p-button icon="pi pi-trash" [text]="true" [rounded]="true" size="small" severity="danger" pTooltip="刪除" tooltipPosition="top" (onClick)="confirmDelete(item)" />
+              </span>
+              <span class="row__cell row__code"><code>{{ item.promoCode }}</code></span>
+              <span class="row__cell row__topic">{{ item.topic }}</span>
+              <span class="row__cell row__description">{{ item.description }}</span>
+            </div>
+          } @else {
+            <div class="row row--empty">
+              <span class="row__slot">{{ cell.slot }}</span>
+              <span class="row__actions">
+                <p-button icon="pi pi-plus" [text]="true" [rounded]="true" size="small" pTooltip="新增" tooltipPosition="top" [disabled]="selectedCenter() === null" (onClick)="startEdit(day, cell)" />
+                <p-button icon="pi pi-clipboard" [text]="true" [rounded]="true" size="small" pTooltip="貼上" tooltipPosition="top" [disabled]="!clipboard() || selectedCenter() === null" (onClick)="paste(day, cell)" />
+              </span>
+              <span class="row__cell row__code muted">—</span>
+              <span class="row__cell row__topic muted"></span>
+              <span class="row__cell row__description muted"></span>
+            </div>
+          }
+        }
+      </section>
+    }
+  </section>
+</div>
