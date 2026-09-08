@@ -275,18 +275,20 @@ ORDER BY c.DisplayOrder ASC, c.pkid DESC
 ### SQL — INSERT
 
 All 23 writable columns (see sample); `SELECT CAST(SCOPE_IDENTITY() AS int)`; then sync both
-junctions; audit `INSERT` with `CourseId`.
+junctions; reload the row and audit `INSERT` with `Title` (`LogInsertAsync`: first string property).
 
 ### SQL — UPDATE
 
-Same 23 columns `WHERE pkid = @Pkid`; then sync both junctions; audit `UPDATE` with the
-changed scalar column names (`AuditHelper.ChangedColumns` against a scalar-only parameter
-object) plus `CertificationPkids` / `JobCategoryPkids` when the id sets differ.
+Same 23 columns `WHERE pkid = @Pkid`; then sync both junctions; reload the row and audit `UPDATE` with
+the changed property names of the before/after snapshots (`LogUpdateAsync`), which include
+`CertificationPkids` / `JobCategoryPkids` when the id sets differ; no row when nothing changed. The JOINed
+label columns (`PartnerName`, `CourseGroupDescription`, `PublishStatusDescription`) are `[AuditIgnore]`d.
+Covered by `Tests\Repositories\CourseRepositoryTests`.
 
 ### SQL — DELETE
 
 `DELETE FROM Course WHERE pkid = @Pkid` — junctions cascade. SQL error 547 (CourseFAQ,
-CourseRelatedLink, HotCourse) → `EntityInUseException` → 409. Audit `DELETE` with `CourseId`.
+CourseRelatedLink, HotCourse) → `EntityInUseException` → 409. Audit `DELETE` with `Title` (`LogDeleteAsync`).
 
 ### Special Column Notes
 

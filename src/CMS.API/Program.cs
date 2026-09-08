@@ -55,9 +55,12 @@ builder.Services.AddCors(options =>
         .AllowCredentials());
 });
 
+// Dapper 2.1 cannot bind DateOnly (Course / FeaturedPromoItem `date` columns) without this handler.
+DapperTypeHandlers.Register();
 builder.Services.AddSingleton<IDbConnectionFactory, SqlConnectionFactory>();
 
-// RowAudit records User.Identity.Name — the JWT `userId` claim once authenticated, "system" otherwise.
+// RowAudit records the JWT `userName` claim of the current request (fallback: Identity.Name = `userId`), "system"
+// when unauthenticated; timestamps come from the TimeProvider registered below.
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<IRowAuditWriter, RowAuditWriter>();
 builder.Services.AddScoped<IRowAuditRepository, RowAuditRepository>();

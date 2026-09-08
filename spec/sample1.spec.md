@@ -353,9 +353,11 @@ For both `CourseInCertification` and `CourseJobCategories`, after INSERT/UPDATE:
 
 ### RowAudit
 
-- INSERT: logs `CourseId` (first string-ish field — use `CourseId`)
-- UPDATE: loads existing entity, logs changed property names via `AuditHelper.ChangedColumns`
-- DELETE: loads existing entity, logs its `CourseId`
+- INSERT: reload the created row, `LogInsertAsync` (description = first string property, `Title`)
+- UPDATE: load the existing row, update, reload, `LogUpdateAsync(before, after)` (changed property
+  names incl. the N-N pkid lists; no row when nothing changed)
+- DELETE: load the existing row, delete, `LogDeleteAsync` (description = `Title`)
+- Mark JOINed label columns on the model `[AuditIgnore]`; string-keyed tables mark the key `[AuditKey]`
 
 ### DateOnly Type Handlers
 

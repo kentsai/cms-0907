@@ -1,13 +1,17 @@
+using CMS.API.Infrastructure;
+
 namespace CMS.API.Models;
 
 /// <summary>
-/// Response model for <c>dbo.AppUser</c>. The clustered primary key is the string <see cref="UserId"/>;
-/// <see cref="Pkid"/> is an IDENTITY surrogate shown as 主代碼 only.
+/// Response model for <c>dbo.AppUser</c>. The clustered primary key is the string <see cref="UserId"/>
+/// (also the RowAudit key); <see cref="Pkid"/> is an IDENTITY surrogate shown as 主代碼 only.
 /// <c>PasswordHash</c> is deliberately absent — it never leaves the backend.
 /// </summary>
 public class AppUser
 {
     public int Pkid { get; set; }
+
+    [AuditKey]
     public string UserId { get; set; } = string.Empty;
     public string UserName { get; set; } = string.Empty;
     public bool IsActive { get; set; }
@@ -16,6 +20,7 @@ public class AppUser
     public DateTime? PasswordUpdatedTime { get; set; }
 
     /// <summary>Number of <c>AppUserRole</c> rows for this user (subquery in SELECT).</summary>
+    [AuditIgnore]
     public int RoleCount { get; set; }
 
     /// <summary>Assigned role ids. Populated on GET by id only.</summary>

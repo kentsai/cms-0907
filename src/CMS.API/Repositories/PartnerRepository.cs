@@ -68,8 +68,10 @@ public sealed class PartnerRepository(IDbConnectionFactory connectionFactory, IR
 
         var pkid = await connection.ExecuteScalarAsync<short>(
             new CommandDefinition(sql, ToParameters(request), transaction, cancellationToken: cancellationToken));
-        await auditWriter.WriteAsync(connection, TableName, pkid.ToString(), RowAuditWriter.Insert,
-            request.Name, cancellationToken, transaction);
+
+        var created = await GetByIdAsync(connection, pkid, cancellationToken, transaction)
+            ?? throw new InvalidOperationException($"{TableName} {pkid} was not found after INSERT.");
+        await auditWriter.LogInsertAsync(connection, TableName, created, cancellationToken, transaction);
 
         await transaction.CommitAsync(cancellationToken);
         return pkid;
@@ -97,16 +99,16 @@ public sealed class PartnerRepository(IDbConnectionFactory connectionFactory, IR
             return false;
         }
 
-        var parameters = ToParameters(request);
-        var affected = await connection.ExecuteAsync(new CommandDefinition(sql, parameters, transaction, cancellationToken: cancellationToken));
+        var affected = await connection.ExecuteAsync(
+            new CommandDefinition(sql, ToParameters(request), transaction, cancellationToken: cancellationToken));
         if (affected == 0)
         {
             return false;
         }
 
-        var changed = AuditHelper.ChangedColumns(existing, parameters);
-        await auditWriter.WriteAsync(connection, TableName, request.Pkid.ToString(), RowAuditWriter.Update,
-            changed.Count == 0 ? "(no changes)" : string.Join(", ", changed), cancellationToken, transaction);
+        var updated = await GetByIdAsync(connection, request.Pkid, cancellationToken, transaction)
+            ?? throw new InvalidOperationException($"{TableName} {request.Pkid} was not found after UPDATE.");
+        await auditWriter.LogUpdateAsync(connection, TableName, existing, updated, cancellationToken, transaction);
 
         await transaction.CommitAsync(cancellationToken);
         return true;
@@ -133,8 +135,7 @@ public sealed class PartnerRepository(IDbConnectionFactory connectionFactory, IR
             throw new EntityInUseException($"合作夥伴 {pkid}「{existing.Name}」仍被課程、認證、說明會或活動使用，無法刪除。");
         }
 
-        await auditWriter.WriteAsync(connection, TableName, pkid.ToString(), RowAuditWriter.Delete,
-            existing.Name, cancellationToken, transaction);
+        await auditWriter.LogDeleteAsync(connection, TableName, existing, cancellationToken, transaction);
 
         await transaction.CommitAsync(cancellationToken);
         return true;
@@ -159,10 +160,7 @@ public sealed class PartnerRepository(IDbConnectionFactory connectionFactory, IR
             SelectColumns + " WHERE pkid = @Pkid", new { Pkid = pkid }, transaction, cancellationToken: cancellationToken));
     }
 
-    /// <summary>
-    /// Normalises the request before it hits SQL (trim strings, blank ImageFilename → NULL) so the
-    /// stored values and the UPDATE audit diff are consistent.
-    /// </summary>
+    /// <summary>Normalises the request before it hits SQL (trim strings, blank ImageFilename → NULL).</summary>
     private static Partner ToParameters(PartnerRequest request) => new()
     {
         Pkid = request.Pkid,

@@ -76,15 +76,15 @@ public sealed class CertificationRepository(IDbConnectionFactory connectionFacto
         await using var connection = await connectionFactory.CreateOpenConnectionAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
 
-        var parameters = ToParameters(request);
         var pkid = await connection.ExecuteScalarAsync<int>(
-            new CommandDefinition(sql, parameters, transaction, cancellationToken: cancellationToken));
+            new CommandDefinition(sql, ToParameters(request), transaction, cancellationToken: cancellationToken));
 
         await SyncCoursesAsync(connection, transaction, pkid, request.CoursePkids, cancellationToken);
         await SyncJobCategoriesAsync(connection, transaction, pkid, request.JobCategoryPkids, cancellationToken);
 
-        await auditWriter.WriteAsync(connection, TableName, pkid.ToString(), RowAuditWriter.Insert,
-            parameters.Title ?? UntitledLabel, cancellationToken, transaction);
+        var created = await GetByIdAsync(connection, pkid, cancellationToken, transaction)
+            ?? throw new InvalidOperationException($"{TableName} {pkid} was not found after INSERT.");
+        await auditWriter.LogInsertAsync(connection, TableName, created, cancellationToken, transaction);
 
         await transaction.CommitAsync(cancellationToken);
         return pkid;
@@ -108,31 +108,21 @@ public sealed class CertificationRepository(IDbConnectionFactory connectionFacto
             return false;
         }
 
-        var parameters = ToParameters(request);
-        var affected = await connection.ExecuteAsync(new CommandDefinition(sql, parameters, transaction, cancellationToken: cancellationToken));
+        var affected = await connection.ExecuteAsync(
+            new CommandDefinition(sql, ToParameters(request), transaction, cancellationToken: cancellationToken));
         if (affected == 0)
         {
             return false;
         }
 
-        var coursePkids = Normalize(request.CoursePkids);
-        var jobCategoryPkids = Normalize(request.JobCategoryPkids);
-        await SyncCoursesAsync(connection, transaction, request.Pkid, coursePkids, cancellationToken);
-        await SyncJobCategoriesAsync(connection, transaction, request.Pkid, jobCategoryPkids, cancellationToken);
+        await SyncCoursesAsync(connection, transaction, request.Pkid, request.CoursePkids, cancellationToken);
+        await SyncJobCategoriesAsync(connection, transaction, request.Pkid, request.JobCategoryPkids, cancellationToken);
 
-        // Scalar diff (shared property names only), then the two junctions compared as sets.
-        var changed = AuditHelper.ChangedColumns(existing, parameters).ToList();
-        if (!Normalize(existing.CoursePkids).SequenceEqual(coursePkids))
-        {
-            changed.Add(nameof(Certification.CoursePkids));
-        }
-        if (!Normalize(existing.JobCategoryPkids).SequenceEqual(jobCategoryPkids))
-        {
-            changed.Add(nameof(Certification.JobCategoryPkids));
-        }
-
-        await auditWriter.WriteAsync(connection, TableName, request.Pkid.ToString(), RowAuditWriter.Update,
-            changed.Count == 0 ? "(no changes)" : string.Join(", ", changed), cancellationToken, transaction);
+        // Both snapshots carry the (sorted) junction lists, so the diff covers scalars and the two N-N sets;
+        // PartnerName is [AuditIgnore]d on the model.
+        var updated = await GetByIdAsync(connection, request.Pkid, cancellationToken, transaction)
+            ?? throw new InvalidOperationException($"{TableName} {request.Pkid} was not found after UPDATE.");
+        await auditWriter.LogUpdateAsync(connection, TableName, existing, updated, cancellationToken, transaction);
 
         await transaction.CommitAsync(cancellationToken);
         return true;
@@ -165,8 +155,7 @@ public sealed class CertificationRepository(IDbConnectionFactory connectionFacto
             throw new EntityInUseException($"認證 {pkid}「{existing.Title ?? UntitledLabel}」仍被其他資料使用，無法刪除。");
         }
 
-        await auditWriter.WriteAsync(connection, TableName, pkid.ToString(), RowAuditWriter.Delete,
-            existing.Title ?? UntitledLabel, cancellationToken, transaction);
+        await auditWriter.LogDeleteAsync(connection, TableName, existing, cancellationToken, transaction);
 
         await transaction.CommitAsync(cancellationToken);
         return true;
@@ -252,10 +241,7 @@ public sealed class CertificationRepository(IDbConnectionFactory connectionFacto
     private static List<T> Normalize<T>(IEnumerable<T>? ids) where T : struct, IComparable<T> =>
         (ids ?? []).Distinct().OrderBy(id => id).ToList();
 
-    /// <summary>
-    /// Scalar-only parameter object: trims Title and blanks it to NULL. Having no label / list members keeps
-    /// <see cref="AuditHelper.ChangedColumns"/> to the real columns.
-    /// </summary>
+    /// <summary>Scalar-only parameter object for the INSERT / UPDATE: trims Title and blanks it to NULL.</summary>
     private static CertificationScalars ToParameters(CertificationRequest request) => new()
     {
         Pkid = request.Pkid,

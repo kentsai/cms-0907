@@ -126,8 +126,8 @@ Signed HS256 with the UTF-8 bytes of `symmetricSecurityKey`; a key shorter than 
 MVC gets a global `AuthorizeFilter(RequireAuthenticatedUser)`. Swagger declares the `Bearer` security scheme.
 
 Validation parameters: issuer `CMS.API`, no audience, lifetime with **1 min** clock skew, signature against
-`ISigningKeyCache.CurrentKeys`, `NameClaimType = userId` (so `User.Identity.Name` and `RowAuditWriter` record
-the UserId), `RoleClaimType = ClaimTypes.Role`.
+`ISigningKeyCache.CurrentKeys`, `NameClaimType = userId` (so `User.Identity.Name` is the UserId; `RowAuditWriter`
+records the `userName` claim and falls back to `Identity.Name`), `RoleClaimType = ClaimTypes.Role`.
 
 Events:
 
@@ -335,7 +335,8 @@ public sealed class PasswordStamp { DateTime? PasswordUpdatedTime; }            
 | Self-service password change | `AppUser` | `UserId` | `UPDATE` | `PasswordHash (changed by user)` |
 | Login / token validation | — | — | — | not audited |
 
-`UserName` on the audit row is the bearer `Identity.Name`, i.e. the caller's `UserId`.
+`UserName` on the audit row is the bearer's `userName` claim (the caller's display name), falling back to
+`Identity.Name` (the `UserId`) when that claim is absent, and `"system"` when the request is unauthenticated.
 
 ---
 

@@ -1,3 +1,5 @@
+using CMS.API.Infrastructure;
+
 namespace CMS.API.Models;
 
 /// <summary>
@@ -18,8 +20,10 @@ public class FeaturedPromoItem
     public string Description { get; set; } = string.Empty;
 
     /// <summary><c>TrainingCenter.Name</c> (INNER JOIN).</summary>
+    [AuditIgnore]
     public string TrainingCenterName { get; set; } = string.Empty;
 
     /// <summary><c>Promotion2.PromoCode</c> (INNER JOIN).</summary>
+    [AuditIgnore]
     public string PromoCode { get; set; } = string.Empty;
 }

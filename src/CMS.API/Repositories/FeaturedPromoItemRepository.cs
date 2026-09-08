@@ -81,8 +81,9 @@ public sealed class FeaturedPromoItemRepository(IDbConnectionFactory connectionF
             throw new SlotOccupiedException(SlotOccupiedMessage(parameters.ScheduleOn, parameters.Slot));
         }
 
-        await auditWriter.WriteAsync(connection, TableName, pkid.ToString(), RowAuditWriter.Insert,
-            Describe(parameters.ScheduleOn, parameters.TrainingCenterPkid, parameters.Slot, parameters.Topic), cancellationToken, transaction);
+        var created = await GetByIdAsync(connection, pkid, cancellationToken, transaction)
+            ?? throw new InvalidOperationException($"{TableName} {pkid} was not found after INSERT.");
+        await auditWriter.LogInsertAsync(connection, TableName, created, cancellationToken, transaction);
 
         await transaction.CommitAsync(cancellationToken);
         return pkid;
@@ -126,9 +127,9 @@ public sealed class FeaturedPromoItemRepository(IDbConnectionFactory connectionF
             return false;
         }
 
-        var changed = AuditHelper.ChangedColumns(existing, parameters);
-        await auditWriter.WriteAsync(connection, TableName, request.Pkid.ToString(), RowAuditWriter.Update,
-            changed.Count == 0 ? "(no changes)" : string.Join(", ", changed), cancellationToken, transaction);
+        var updated = await GetByIdAsync(connection, request.Pkid, cancellationToken, transaction)
+            ?? throw new InvalidOperationException($"{TableName} {request.Pkid} was not found after UPDATE.");
+        await auditWriter.LogUpdateAsync(connection, TableName, existing, updated, cancellationToken, transaction);
 
         await transaction.CommitAsync(cancellationToken);
         return true;
@@ -149,8 +150,7 @@ public sealed class FeaturedPromoItemRepository(IDbConnectionFactory connectionF
         await connection.ExecuteAsync(new CommandDefinition(
             "DELETE FROM FeaturedPromoItem WHERE pkid = @Pkid", new { Pkid = pkid }, transaction, cancellationToken: cancellationToken));
 
-        await auditWriter.WriteAsync(connection, TableName, pkid.ToString(), RowAuditWriter.Delete,
-            Describe(existing.ScheduleOn, existing.TrainingCenterPkid, existing.Slot, existing.PromoCode), cancellationToken, transaction);
+        await auditWriter.LogDeleteAsync(connection, TableName, existing, cancellationToken, transaction);
 
         await transaction.CommitAsync(cancellationToken);
         return true;
@@ -214,10 +214,7 @@ public sealed class FeaturedPromoItemRepository(IDbConnectionFactory connectionF
     private static string SlotOccupiedMessage(DateOnly scheduleOn, byte slot) =>
         $"{scheduleOn:yyyy-MM-dd} 的版位 {slot} 已有資料，無法儲存。";
 
-    private static string Describe(DateOnly scheduleOn, short trainingCenterPkid, byte slot, string text) =>
-        $"{scheduleOn:yyyy-MM-dd} TC{trainingCenterPkid} Slot{slot} {text}";
-
-    /// <summary>Scalar-only parameter object so <see cref="AuditHelper.ChangedColumns"/> sees just the real columns.</summary>
+    /// <summary>Scalar-only parameter object for the INSERT / UPDATE (trimmed text).</summary>
     private static FeaturedPromoItemScalars ToParameters(FeaturedPromoItemRequest request) => new()
     {
         Pkid = request.Pkid,

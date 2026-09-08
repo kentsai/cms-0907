@@ -232,9 +232,13 @@ DELETE FROM AppUser WHERE UserId = @UserId;
 | Action | `PrimaryKeyValues` | `ActionType` | `ActionDesc` |
 |--------|--------------------|--------------|--------------|
 | Create | `UserId` | `INSERT` | `UserName` |
-| Update | `UserId` | `UPDATE` | changed scalars (`UserName`, `IsActive`) + `RoleIds` when the set changed |
+| Update | `UserId` | `UPDATE` | changed columns (`UserName`, `IsActive`) + `RoleIds` when the set changed; **no row** when nothing changed |
 | Reset password | `UserId` | `UPDATE` | `PasswordHash (reset to default)` |
 | Delete | `UserId` | `DELETE` | `UserName` |
+
+Create / Update / Delete go through the generic `IRowAuditWriter.LogInsertAsync / LogUpdateAsync / LogDeleteAsync`
+(row reloaded with its sorted `RoleIds` in the same transaction for the after-image); `UserId` is the model's
+`[AuditKey]` and `RoleCount` is `[AuditIgnore]`d. Reset password keeps its custom `WriteAsync` description.
 
 ### Special Column Notes
 

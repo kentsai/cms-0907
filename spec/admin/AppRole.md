@@ -250,8 +250,12 @@ INSERT INTO AppUserRole (UserId, RoleId) VALUES (@UserId, @RoleId);  -- per dist
 | Action | `TableName` | `PrimaryKeyValues` | `ActionType` | `ActionDesc` |
 |--------|-------------|--------------------|--------------|--------------|
 | Create | `AppRole` | `RoleId` | `INSERT` | `RoleName` |
-| Update | `AppRole` | `RoleId` | `UPDATE` | changed scalar columns via `AuditHelper.ChangedColumns`, plus `UserIds` when the set changed |
+| Update | `AppRole` | `RoleId` | `UPDATE` | changed columns (`RoleName`, `PermissionLevel`, `Description`) plus `UserIds` when the set changed; **no row** when nothing changed |
 | Delete | `AppRole` | `RoleId` | `DELETE` | `RoleName` |
+
+Written through the generic `IRowAuditWriter.LogInsertAsync / LogUpdateAsync / LogDeleteAsync` (the row is
+reloaded, with its sorted `UserIds`, in the same transaction for the after-image). `RoleId` is the model's
+`[AuditKey]` — the audit badge looks rows up by it, not by the surrogate `pkid` — and `UserCount` is `[AuditIgnore]`d.
 
 ### Special Column Notes
 

@@ -75,8 +75,10 @@ public sealed class PublishStatusRepository(IDbConnectionFactory connectionFacto
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
 
         await connection.ExecuteAsync(new CommandDefinition(sql, request, transaction, cancellationToken: cancellationToken));
-        await auditWriter.WriteAsync(connection, TableName, request.Pkid.ToString(), RowAuditWriter.Insert,
-            request.Description, cancellationToken, transaction);
+
+        var created = await GetByIdAsync(connection, request.Pkid, cancellationToken, transaction)
+            ?? throw new InvalidOperationException($"{TableName} {request.Pkid} was not found after INSERT.");
+        await auditWriter.LogInsertAsync(connection, TableName, created, cancellationToken, transaction);
 
         await transaction.CommitAsync(cancellationToken);
         return request.Pkid;
@@ -108,9 +110,9 @@ public sealed class PublishStatusRepository(IDbConnectionFactory connectionFacto
             return false;
         }
 
-        var changed = AuditHelper.ChangedColumns(existing, request);
-        await auditWriter.WriteAsync(connection, TableName, request.Pkid.ToString(), RowAuditWriter.Update,
-            changed.Count == 0 ? "(no changes)" : string.Join(", ", changed), cancellationToken, transaction);
+        var updated = await GetByIdAsync(connection, request.Pkid, cancellationToken, transaction)
+            ?? throw new InvalidOperationException($"{TableName} {request.Pkid} was not found after UPDATE.");
+        await auditWriter.LogUpdateAsync(connection, TableName, existing, updated, cancellationToken, transaction);
 
         await transaction.CommitAsync(cancellationToken);
         return true;
@@ -137,8 +139,7 @@ public sealed class PublishStatusRepository(IDbConnectionFactory connectionFacto
             throw new EntityInUseException($"發布狀態 {pkid}「{existing.Description}」仍被其他資料使用，無法刪除。");
         }
 
-        await auditWriter.WriteAsync(connection, TableName, pkid.ToString(), RowAuditWriter.Delete,
-            existing.Description, cancellationToken, transaction);
+        await auditWriter.LogDeleteAsync(connection, TableName, existing, cancellationToken, transaction);
 
         await transaction.CommitAsync(cancellationToken);
         return true;

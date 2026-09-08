@@ -1,3 +1,5 @@
+using CMS.API.Infrastructure;
+
 namespace CMS.API.Models;
 
 /// <summary>
@@ -13,6 +15,7 @@ public class Certification
     public string? Title { get; set; }
 
     /// <summary><c>Partner.Name</c> (INNER JOIN).</summary>
+    [AuditIgnore]
     public string PartnerName { get; set; } = string.Empty;
 
     /// <summary>Linked <c>Course.pkid</c> values via <c>CourseInCertification</c>.</summary>

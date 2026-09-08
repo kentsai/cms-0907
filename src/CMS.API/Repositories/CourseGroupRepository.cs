@@ -62,11 +62,12 @@ public sealed class CourseGroupRepository(IDbConnectionFactory connectionFactory
         await using var connection = await connectionFactory.CreateOpenConnectionAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
 
-        var parameters = ToParameters(request);
         var pkid = await connection.ExecuteScalarAsync<short>(
-            new CommandDefinition(sql, parameters, transaction, cancellationToken: cancellationToken));
-        await auditWriter.WriteAsync(connection, TableName, pkid.ToString(), RowAuditWriter.Insert,
-            parameters.Description, cancellationToken, transaction);
+            new CommandDefinition(sql, ToParameters(request), transaction, cancellationToken: cancellationToken));
+
+        var created = await GetByIdAsync(connection, pkid, cancellationToken, transaction)
+            ?? throw new InvalidOperationException($"{TableName} {pkid} was not found after INSERT.");
+        await auditWriter.LogInsertAsync(connection, TableName, created, cancellationToken, transaction);
 
         await transaction.CommitAsync(cancellationToken);
         return pkid;
@@ -89,16 +90,16 @@ public sealed class CourseGroupRepository(IDbConnectionFactory connectionFactory
             return false;
         }
 
-        var parameters = ToParameters(request);
-        var affected = await connection.ExecuteAsync(new CommandDefinition(sql, parameters, transaction, cancellationToken: cancellationToken));
+        var affected = await connection.ExecuteAsync(
+            new CommandDefinition(sql, ToParameters(request), transaction, cancellationToken: cancellationToken));
         if (affected == 0)
         {
             return false;
         }
 
-        var changed = AuditHelper.ChangedColumns(existing, parameters);
-        await auditWriter.WriteAsync(connection, TableName, request.Pkid.ToString(), RowAuditWriter.Update,
-            changed.Count == 0 ? "(no changes)" : string.Join(", ", changed), cancellationToken, transaction);
+        var updated = await GetByIdAsync(connection, request.Pkid, cancellationToken, transaction)
+            ?? throw new InvalidOperationException($"{TableName} {request.Pkid} was not found after UPDATE.");
+        await auditWriter.LogUpdateAsync(connection, TableName, existing, updated, cancellationToken, transaction);
 
         await transaction.CommitAsync(cancellationToken);
         return true;
@@ -125,8 +126,7 @@ public sealed class CourseGroupRepository(IDbConnectionFactory connectionFactory
             throw new EntityInUseException($"課程群組 {pkid}「{existing.Description}」仍被課程或夥伴課程群組使用，無法刪除。");
         }
 
-        await auditWriter.WriteAsync(connection, TableName, pkid.ToString(), RowAuditWriter.Delete,
-            existing.Description, cancellationToken, transaction);
+        await auditWriter.LogDeleteAsync(connection, TableName, existing, cancellationToken, transaction);
 
         await transaction.CommitAsync(cancellationToken);
         return true;
@@ -151,7 +151,7 @@ public sealed class CourseGroupRepository(IDbConnectionFactory connectionFactory
             SelectColumns + " WHERE pkid = @Pkid", new { Pkid = pkid }, transaction, cancellationToken: cancellationToken));
     }
 
-    /// <summary>Normalises the request (trim) so stored values and the UPDATE audit diff are consistent.</summary>
+    /// <summary>Normalises the request (trim) before it hits SQL.</summary>
     private static CourseGroup ToParameters(CourseGroupRequest request) => new()
     {
         Pkid = request.Pkid,

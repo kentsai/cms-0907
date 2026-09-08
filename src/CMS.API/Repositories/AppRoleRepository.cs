@@ -52,14 +52,7 @@ public sealed class AppRoleRepository(IDbConnectionFactory connectionFactory, IR
     public async Task<AppRole?> GetByIdAsync(string roleId, CancellationToken cancellationToken)
     {
         await using var connection = await connectionFactory.CreateOpenConnectionAsync(cancellationToken);
-        var role = await GetByIdAsync(connection, roleId, cancellationToken);
-        if (role is null)
-        {
-            return null;
-        }
-
-        role.UserIds = await GetUserIdsAsync(connection, roleId, cancellationToken);
-        return role;
+        return await GetByIdAsync(connection, roleId, cancellationToken);
     }
 
     public async Task<bool> ExistsAsync(string roleId, CancellationToken cancellationToken)
@@ -87,8 +80,10 @@ public sealed class AppRoleRepository(IDbConnectionFactory connectionFactory, IR
 
         await SyncUsersAsync(connection, transaction, request.RoleId, request.UserIds, cancellationToken);
 
-        await auditWriter.WriteAsync(connection, TableName, request.RoleId, RowAuditWriter.Insert,
-            request.RoleName, cancellationToken, transaction);
+        // PrimaryKeyValues is RoleId ([AuditKey]), ActionDesc the RoleName.
+        var created = await GetByIdAsync(connection, request.RoleId, cancellationToken, transaction)
+            ?? throw new InvalidOperationException($"{TableName} '{request.RoleId}' was not found after INSERT.");
+        await auditWriter.LogInsertAsync(connection, TableName, created, cancellationToken, transaction);
 
         await transaction.CommitAsync(cancellationToken);
         return pkid;
@@ -112,23 +107,17 @@ public sealed class AppRoleRepository(IDbConnectionFactory connectionFactory, IR
         {
             return false;
         }
-        existing.UserIds = await GetUserIdsAsync(connection, request.RoleId, cancellationToken, transaction);
 
         await connection.ExecuteAsync(
             new CommandDefinition(sql, ScalarParameters(request), transaction, cancellationToken: cancellationToken));
 
         await SyncUsersAsync(connection, transaction, request.RoleId, request.UserIds, cancellationToken);
 
-        var changed = AuditHelper.ChangedColumns(existing, request)
-            .Where(c => c is not nameof(AppRole.UserIds) and not nameof(AppRole.UserCount))
-            .ToList();
-        if (!Normalize(existing.UserIds).SequenceEqual(Normalize(request.UserIds)))
-        {
-            changed.Add(nameof(AppRole.UserIds));
-        }
-
-        await auditWriter.WriteAsync(connection, TableName, request.RoleId, RowAuditWriter.Update,
-            changed.Count == 0 ? "(no changes)" : string.Join(", ", changed), cancellationToken, transaction);
+        // Both snapshots carry the sorted UserIds, so the diff covers the scalar columns and the membership set
+        // (UserCount is [AuditIgnore]d on the model).
+        var updated = await GetByIdAsync(connection, request.RoleId, cancellationToken, transaction)
+            ?? throw new InvalidOperationException($"{TableName} '{request.RoleId}' was not found after UPDATE.");
+        await auditWriter.LogUpdateAsync(connection, TableName, existing, updated, cancellationToken, transaction);
 
         await transaction.CommitAsync(cancellationToken);
         return true;
@@ -156,8 +145,7 @@ public sealed class AppRoleRepository(IDbConnectionFactory connectionFactory, IR
             throw new EntityInUseException($"角色「{existing.RoleName}」仍被其他資料使用，無法刪除。");
         }
 
-        await auditWriter.WriteAsync(connection, TableName, roleId, RowAuditWriter.Delete,
-            existing.RoleName, cancellationToken, transaction);
+        await auditWriter.LogDeleteAsync(connection, TableName, existing, cancellationToken, transaction);
 
         await transaction.CommitAsync(cancellationToken);
         return true;
@@ -182,11 +170,19 @@ public sealed class AppRoleRepository(IDbConnectionFactory connectionFactory, IR
         Description = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim()
     };
 
-    private static Task<AppRole?> GetByIdAsync(
+    /// <summary>The role with its sorted <see cref="AppRole.UserIds"/>, or null.</summary>
+    private static async Task<AppRole?> GetByIdAsync(
         DbConnection connection, string roleId, CancellationToken cancellationToken, DbTransaction? transaction = null)
     {
-        return connection.QuerySingleOrDefaultAsync<AppRole>(new CommandDefinition(
+        var role = await connection.QuerySingleOrDefaultAsync<AppRole>(new CommandDefinition(
             SelectColumns + " WHERE r.RoleId = @RoleId", new { RoleId = roleId }, transaction, cancellationToken: cancellationToken));
+        if (role is null)
+        {
+            return null;
+        }
+
+        role.UserIds = await GetUserIdsAsync(connection, roleId, cancellationToken, transaction);
+        return role;
     }
 
     private static async Task<List<string>> GetUserIdsAsync(

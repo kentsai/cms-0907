@@ -24,4 +24,24 @@ public class AuditHelperTests
 
         Assert.Empty(AuditHelper.ChangedColumns(before, after));
     }
+
+    [Fact]
+    public void ChangedColumns_SkipsAuditIgnoredProperties()
+    {
+        var before = new Course { Pkid = 1, PartnerPkid = 1, PartnerName = "Microsoft", PublishStatusDescription = "Draft" };
+        var after = new Course { Pkid = 1, PartnerPkid = 2, PartnerName = "Amazon", PublishStatusDescription = "Published" };
+
+        Assert.Equal(new[] { nameof(Course.PartnerPkid) }, AuditHelper.ChangedColumns(before, after));
+    }
+
+    [Fact]
+    public void ChangedColumns_ComparesSequencesByElements_NotByReference()
+    {
+        var before = new Course { Pkid = 1, CourseId = "C1", CertificationPkids = [1, 2], JobCategoryPkids = [3] };
+        var same = new Course { Pkid = 1, CourseId = "C1", CertificationPkids = [1, 2], JobCategoryPkids = [3] };
+        var reordered = new Course { Pkid = 1, CourseId = "C1", CertificationPkids = [2, 1], JobCategoryPkids = [3] };
+
+        Assert.Empty(AuditHelper.ChangedColumns(before, same));
+        Assert.Equal(new[] { nameof(Course.CertificationPkids) }, AuditHelper.ChangedColumns(before, reordered));
+    }
 }

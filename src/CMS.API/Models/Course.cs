@@ -1,8 +1,11 @@
+using CMS.API.Infrastructure;
+
 namespace CMS.API.Models;
 
 /// <summary>
 /// Response model for <c>dbo.Course</c>. FK label columns are JOINed in every SELECT so list pages can
-/// show names without extra lookups; the N-N pkid lists are populated only by <c>GetByIdAsync</c>.
+/// show names without extra lookups (they are <see cref="AuditIgnoreAttribute"/>d: not columns of Course);
+/// the N-N pkid lists are populated only by <c>GetByIdAsync</c>.
 /// </summary>
 public class Course
 {
@@ -32,12 +35,15 @@ public class Course
     public bool CanRepeat { get; set; }
 
     /// <summary><c>Partner.Name</c> (INNER JOIN).</summary>
+    [AuditIgnore]
     public string PartnerName { get; set; } = string.Empty;
 
     /// <summary><c>CourseGroup.Description</c> (LEFT JOIN — null when the course has no group).</summary>
+    [AuditIgnore]
     public string? CourseGroupDescription { get; set; }
 
     /// <summary><c>PublishStatus.Description</c> (INNER JOIN).</summary>
+    [AuditIgnore]
     public string PublishStatusDescription { get; set; } = string.Empty;
 
     /// <summary>Linked <c>Certification.pkid</c> values via <c>CourseInCertification</c>.</summary>
