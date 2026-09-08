@@ -3,7 +3,8 @@
 .NET 9 Web API + Dapper (`src\CMS.API`, xUnit tests in `src\CMS.API.Tests`) and Angular 20 +
 PrimeNG Aura (`src\CMS.NG`), scaffolded from the SQL Server schema in `database\*.sql`.
 Feature specs: `spec\{sub-system}\{Table}.md`; login / JWT / profile / change-password flows are
-specified in `spec\auth\Auth.md`. New features: run `/crud`.
+specified in `spec\auth\Auth.md`. Approved implementation plans (design decisions, with the commit that
+built them) live in `plans\YYYY-MM-DD-<feature>.md`. New features: run `/crud`.
 
 ## Commands (API and frontend in separate terminals, no proxy)
 
