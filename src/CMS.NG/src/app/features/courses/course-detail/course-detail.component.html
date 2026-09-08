@@ -25,65 +25,72 @@
   </p-card>
 } @else if (item(); as it) {
   <p-card header="基本資料" styleClass="detail-card">
-    <dl class="detail-grid">
-      <dt>主代碼</dt>
-      <dd>{{ it.pkid }}</dd>
+    <div class="basic-info">
+      <dl class="detail-grid">
+        <dt>主代碼</dt>
+        <dd>{{ it.pkid }}</dd>
 
-      <dt>課程名稱</dt>
-      <dd>{{ it.title }}</dd>
+        <dt>課程名稱</dt>
+        <dd>{{ it.title }}</dd>
 
-      <dt>官方課程名稱</dt>
-      <dd>{{ it.officialTitle || '—' }}</dd>
+        <dt>官方課程名稱</dt>
+        <dd>{{ it.officialTitle || '—' }}</dd>
 
-      <dt>簡介代碼</dt>
-      <dd><code>{{ it.courseId }}</code></dd>
+        <dt>簡介代碼</dt>
+        <dd><code>{{ it.courseId }}</code></dd>
 
-      <dt>科目代碼</dt>
-      <dd><code>{{ it.prodCourseId }}</code></dd>
+        <dt>科目代碼</dt>
+        <dd><code>{{ it.prodCourseId }}</code></dd>
 
-      <dt>友善網址</dt>
-      <dd><code>{{ it.friendlyUrl }}</code></dd>
+        <dt>友善網址</dt>
+        <dd><code>{{ it.friendlyUrl }}</code></dd>
 
-      <dt>顯示順序</dt>
-      <dd>{{ it.displayOrder }}</dd>
+        <dt>顯示順序</dt>
+        <dd>{{ it.displayOrder }}</dd>
 
-      <dt>原廠</dt>
-      <dd>
-        <a [routerLink]="['/course/partners', it.partnerPkid]" class="fk-link">{{ it.partnerName }}</a>
-      </dd>
+        <dt>原廠</dt>
+        <dd>
+          <a [routerLink]="['/course/partners', it.partnerPkid]" class="fk-link">{{ it.partnerName }}</a>
+        </dd>
 
-      <dt>課程群組</dt>
-      <dd>
-        @if (it.courseGroupPkid !== null) {
-          <a [routerLink]="['/course/course-groups', it.courseGroupPkid]" class="fk-link">{{ it.courseGroupDescription }}</a>
-        } @else {
-          —
-        }
-      </dd>
+        <dt>課程群組</dt>
+        <dd>
+          @if (it.courseGroupPkid !== null) {
+            <a [routerLink]="['/course/course-groups', it.courseGroupPkid]" class="fk-link">{{ it.courseGroupDescription }}</a>
+          } @else {
+            —
+          }
+        </dd>
 
-      <dt>上架狀態</dt>
-      <dd>
-        <a [routerLink]="['/admin/publish-statuses', it.publishStatusPkid]" class="fk-link">{{ it.publishStatusDescription }}</a>
-      </dd>
+        <dt>上架狀態</dt>
+        <dd>
+          <a [routerLink]="['/admin/publish-statuses', it.publishStatusPkid]" class="fk-link">{{ it.publishStatusDescription }}</a>
+        </dd>
 
-      <dt>上架日期</dt>
-      <dd>{{ it.scheduleOn }}</dd>
+        <dt>上架日期</dt>
+        <dd>{{ it.scheduleOn }}</dd>
 
-      <dt>下架日期</dt>
-      <dd>{{ it.scheduleOff }}</dd>
+        <dt>下架日期</dt>
+        <dd>{{ it.scheduleOff }}</dd>
 
-      <dt>時數</dt>
-      <dd>{{ it.hour }}</dd>
+        <dt>時數</dt>
+        <dd>{{ it.hour }}</dd>
 
-      <dt>定價</dt>
-      <dd>{{ it.listPrice | number:'1.0-0' }}</dd>
+        <dt>定價</dt>
+        <dd>{{ it.listPrice | number:'1.0-0' }}</dd>
 
-      <dt>點數</dt>
-      <dd>{{ it.learningCredit | number:'1.1-1' }}</dd>
+        <dt>點數</dt>
+        <dd>{{ it.learningCredit | number:'1.1-1' }}</dd>
 
-      <dt>允許重聽</dt>
-      <dd>{{ it.canRepeat ? '是' : '否' }}</dd>
-    </dl>
+        <dt>允許重聽</dt>
+        <dd>{{ it.canRepeat ? '是' : '否' }}</dd>
+      </dl>
+
+      <aside class="basic-info__qr">
+        <app-qr-code [text]="qrUrl()" [title]="it.courseId" [fileName]="it.courseId + '.png'" />
+        <a class="basic-info__qr-link" [href]="qrUrl()" target="_blank" rel="noopener">{{ qrUrl() }}</a>
+      </aside>
+    </div>
   </p-card>
 
   <p-card header="課程內容" styleClass="detail-card">

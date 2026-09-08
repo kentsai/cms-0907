@@ -6,15 +6,16 @@ import { ButtonModule } from 'primeng/button';
 import { CardModule } from 'primeng/card';
 import { ToolbarModule } from 'primeng/toolbar';
 import { forkJoin } from 'rxjs';
+import { QrCodeComponent } from '@core/components/qr-code/qr-code.component';
 import { RowAuditBadgeComponent } from '@core/components/row-audit-badge/row-audit-badge.component';
-import { Course } from '@core/models/course.model';
+import { Course, courseShowUrl } from '@core/models/course.model';
 import { LookupItem } from '@core/models/lookup-item.model';
 import { CourseService } from '@core/services/course.service';
 import { LookupService } from '@core/services/lookup.service';
 
 @Component({
   selector: 'app-course-detail',
-  imports: [DecimalPipe, RouterLink, ButtonModule, CardModule, ToolbarModule, RowAuditBadgeComponent],
+  imports: [DecimalPipe, RouterLink, ButtonModule, CardModule, ToolbarModule, RowAuditBadgeComponent, QrCodeComponent],
   templateUrl: './course-detail.component.html',
   styleUrl: './course-detail.component.scss'
 })
@@ -36,6 +37,12 @@ export class CourseDetailComponent implements OnInit {
   /** Certification labels for the linked pkids (falls back to the raw id if the lookup lacks it). */
   protected readonly certificationLabels = computed(() => this.labelsFor(this.item()?.certificationPkids ?? [], this.certifications()));
   protected readonly jobCategoryLabels = computed(() => this.labelsFor(this.item()?.jobCategoryPkids ?? [], this.jobCategories()));
+
+  /** Public course page URL encoded in the QR code (`/Course/Show/{pkid}/{courseId}`). */
+  protected readonly qrUrl = computed(() => {
+    const item = this.item();
+    return item ? courseShowUrl(item) : '';
+  });
 
   protected pkid = 0;
 

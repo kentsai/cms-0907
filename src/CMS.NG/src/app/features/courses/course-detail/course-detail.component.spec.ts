@@ -6,6 +6,7 @@ import { of, throwError } from 'rxjs';
 import { Course } from '@core/models/course.model';
 import { CourseService } from '@core/services/course.service';
 import { LookupService } from '@core/services/lookup.service';
+import { QrCodeService } from '@core/services/qr-code.service';
 import { RowAuditService } from '@core/services/row-audit.service';
 import { CourseDetailComponent } from './course-detail.component';
 
@@ -140,6 +141,61 @@ describe('CourseDetailComponent', () => {
 
     expect(rowAudits.getForRow).toHaveBeenCalledWith('Course', 1, 1);
     expect((fixture.nativeElement as HTMLElement).textContent).toContain('最後異動 system');
+  });
+
+  describe('QR code (基本資料)', () => {
+    const expectedUrl = 'https://www.uuu.com.tw/Course/Show/1/AZ-104';
+
+    async function settle(fixture: ComponentFixture<CourseDetailComponent>): Promise<void> {
+      await fixture.whenStable();
+      await new Promise(resolve => setTimeout(resolve, 0));
+      fixture.detectChanges();
+    }
+
+    it('encodes the public course URL built from pkid and courseId', async () => {
+      const toCanvas = spyOn(QrCodeService.prototype, 'toCanvas').and.callThrough();
+      const fixture = await setup();
+      await settle(fixture);
+      const host = fixture.nativeElement as HTMLElement;
+
+      expect(toCanvas).toHaveBeenCalledWith(jasmine.any(HTMLCanvasElement), expectedUrl, jasmine.anything());
+      expect(host.querySelector('.basic-info figure.qr-code')?.getAttribute('data-qr-text')).toBe(expectedUrl);
+      expect(host.querySelector<HTMLAnchorElement>('.basic-info__qr-link')?.href).toBe(expectedUrl);
+    });
+
+    it('uses a different record\'s pkid and courseId in the URL', async () => {
+      service.getById.and.returnValue(of({ ...item, pkid: 42, courseId: 'MS-900' }));
+      const fixture = await setup('42');
+      await settle(fixture);
+
+      expect((fixture.nativeElement as HTMLElement).querySelector('figure.qr-code')?.getAttribute('data-qr-text'))
+        .toBe('https://www.uuu.com.tw/Course/Show/42/MS-900');
+    });
+
+    it('shows the courseId as the QR code title', async () => {
+      const fixture = await setup();
+      await settle(fixture);
+
+      const caption = (fixture.nativeElement as HTMLElement).querySelector('figure.qr-code figcaption');
+      expect(caption?.textContent?.trim()).toBe('AZ-104');
+    });
+
+    it('downloads the QR code as a PNG named after the courseId', async () => {
+      const fixture = await setup();
+      await settle(fixture);
+      let clicked: HTMLAnchorElement | undefined;
+      spyOn(HTMLAnchorElement.prototype, 'click').and.callFake(function (this: HTMLAnchorElement) {
+        clicked = this;
+      });
+
+      const button = (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>('.qr-code__download button')!;
+      expect(button.disabled).toBeFalse();
+      button.click();
+
+      expect(clicked).toBeDefined();
+      expect(clicked!.download).toBe('AZ-104.png');
+      expect(clicked!.href.startsWith('data:image/png;base64,')).toBeTrue();
+    });
   });
 
   it('shows a not-found message on 404', async () => {

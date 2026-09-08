@@ -32,9 +32,11 @@ DisplayOrder column).
 `courseGroupDescription`, `publishStatusDescription`. N-N `CourseInCertification` +
 `CourseJobCategories` via two `p-multiselect`s (both junctions `ON DELETE CASCADE`).
 `date` columns as `DateOnly` with `p-datepicker`; `ScheduleOff` auto-defaults to
-`ScheduleOn + 10y`. Deliberately **not** built from the sample spec: `/copy`, QR code,
-print-to-PDF, CourseRelatedLink / CourseRecomm sub-panels; `ClassSection` is not in the
-schema.
+`ScheduleOn + 10y`. The detail page's `基本資料` card shows a **QR code** (`app-qr-code`,
+`core/components/qr-code`) encoding `https://www.uuu.com.tw/Course/Show/{pkid}/{courseId}`
+(`courseShowUrl` in `course.model.ts`), captioned with `courseId`, downloadable as
+`{courseId}.png`. Deliberately **not** built from the sample spec: `/copy`, print-to-PDF,
+CourseRelatedLink / CourseRecomm sub-panels; `ClassSection` is not in the schema.
 
 **Certification** (`spec\course\Certification.md`) — int IDENTITY PK, required `Partner_pkid`
 (JOINed as `partnerName`), nullable **`nchar(100)` Title** (`RTRIM` in every SELECT, blank → NULL

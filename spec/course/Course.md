@@ -22,8 +22,11 @@ three lookup tables (`Partner`, `CourseGroup`, `PublishStatus`). It has two pure
 | Default Sort | `DisplayOrder ASC, pkid DESC` |
 
 **Out of scope for this iteration** (mentioned in the reference sample spec but not part of the
-standard `/crud` deliverable): the `POST /copy` action, QR-code rendering, print-to-PDF, and the
-inline `CourseRelatedLink` / `CourseRecomm` sub-panels. `ClassSection` does not exist in
+standard `/crud` deliverable): the `POST /copy` action, print-to-PDF, and the
+inline `CourseRelatedLink` / `CourseRecomm` sub-panels. QR-code rendering was added afterwards:
+the detail page's `基本資料` card shows a QR code for
+`https://www.uuu.com.tw/Course/Show/{pkid}/{CourseId}` titled with `CourseId`, with a
+`下載 QR Code` button that saves it as `{CourseId}.png` (title baked into the image). `ClassSection` does not exist in
 `database\course.sql`, so no 查看開課時間 link is generated.
 
 ---

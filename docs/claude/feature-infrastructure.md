@@ -36,6 +36,11 @@ Overview and always-on conventions are in `CLAUDE.md`.
 
 - `core/services/lookup.service.ts` — one method per lookup endpoint.
 - `core/components/row-audit-badge` — shown in detail/edit toolbars (`#start` slot).
+- `core/components/qr-code` (`app-qr-code`) — `text` / `title` / `fileName` / `size` inputs;
+  renders via `core/services/qr-code.service.ts` (wraps the `qrcode` npm package, listed in
+  `angular.json` `allowedCommonJsDependencies`). Spy on `QrCodeService.prototype.toCanvas`
+  in tests to assert the encoded text; the download composites the title under the symbol
+  into a PNG data URL.
 - `core/utils/session-storage.util.ts` — guarded read/write for `{entity}-list-*` keys.
 - `core/utils/date.util.ts` — `toIso` / `fromIso` / `addYears` / `addDays` / `startOfWeek`
   (Monday) / `formatMonthDayWeekday` (`3/16 (一)`) for `date` columns (local components only,

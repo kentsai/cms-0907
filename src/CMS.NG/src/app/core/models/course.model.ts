@@ -62,3 +62,11 @@ export const EMPTY_COURSE_QUERY: CourseQuery = {
   scheduleOffTo: null,
   canRepeat: null
 };
+
+/** Base of the public course page; the QR code on the detail page points here. */
+export const COURSE_SHOW_URL_BASE = 'https://www.uuu.com.tw/Course/Show';
+
+/** Public URL of a course: `https://www.uuu.com.tw/Course/Show/{pkid}/{courseId}`. */
+export function courseShowUrl(course: Pick<Course, 'pkid' | 'courseId'>): string {
+  return `${COURSE_SHOW_URL_BASE}/${course.pkid}/${encodeURIComponent(course.courseId)}`;
+}
