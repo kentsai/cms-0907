@@ -5,8 +5,7 @@ non-obvious behaviour. Specs live in `spec\{sub-system}\{Table}.md`; build with 
 
 Totals as of 2026-09-08: **207 xUnit + 243 Karma** tests passing; `ng build` succeeds
 (the initial bundle exceeds the 500 kB budget *warning* because of PrimeNG shared chunks —
-not an error). Features up to Course are committed on `develop` (`2eb4a33`); Certification and
-FeaturedPromoItem are in the working tree, not yet committed.
+not an error). All features below are committed and pushed on `develop` (latest `05941bc`).
 
 ## Built
 

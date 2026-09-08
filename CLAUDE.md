@@ -52,7 +52,7 @@ cd C:\dev\cms\src\CMS.NG; npx ng test --watch=false --browsers=ChromeHeadless
 
 ## Status
 
-Built: PublishStatus, AppRole, AppUser, Partner, CourseGroup, Course (committed on `develop`,
-`2eb4a33`), Certification and the custom FeaturedPromoItem weekly board (working tree).
-207 xUnit + 243 Karma tests pass. Remaining tables are listed in
+Built: PublishStatus, AppRole, AppUser, Partner, CourseGroup, Course, Certification, and the
+custom FeaturedPromoItem weekly board (`首頁 Home` menu). All committed and pushed on
+`develop` (`05941bc`); 207 xUnit + 243 Karma tests pass. Remaining tables are listed in
 `docs\claude\feature-status.md`.
