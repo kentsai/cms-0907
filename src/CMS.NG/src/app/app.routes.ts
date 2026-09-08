@@ -1,6 +1,8 @@
 import { Routes } from '@angular/router';
+import { authGuard } from '@core/guards/auth.guard';
 
-export const routes: Routes = [
+/** Every signed-in page. Wrapped by `routes` below, which guards the whole group. */
+const featureRoutes: Routes = [
   {
     // Weekly board with inline edit — a single page, no detail / form routes.
     path: 'home/featured-promo-items',
@@ -216,6 +218,28 @@ export const routes: Routes = [
           import('@features/certifications/certification-form/certification-form.component')
             .then(m => m.CertificationFormComponent)
       }
+    ]
+  }
+];
+
+export const routes: Routes = [
+  {
+    // Public: the only page reachable without a token.
+    path: 'login',
+    loadComponent: () => import('@features/auth/login/login.component').then(m => m.LoginComponent)
+  },
+  {
+    // Everything else requires a token in session storage (see authGuard); otherwise → /login?returnUrl=…
+    path: '',
+    canActivateChild: [authGuard],
+    children: [
+      { path: '', pathMatch: 'full', redirectTo: 'home/featured-promo-items' },
+      {
+        // 個人資料 My Profile — the signed-in user's own UserName.
+        path: 'profile',
+        loadComponent: () => import('@features/auth/profile/profile.component').then(m => m.ProfileComponent)
+      },
+      ...featureRoutes
     ]
   }
 ];

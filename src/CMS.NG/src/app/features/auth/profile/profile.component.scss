@@ -1,0 +1,81 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.card-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+::ng-deep .page-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+
+.toolbar-title h1 {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.toolbar-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.form-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  max-width: 480px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin: 0;
+
+  label {
+    font-weight: 600;
+    font-size: 0.875rem;
+  }
+
+  input {
+    width: 100%;
+  }
+
+  input[readonly] {
+    color: var(--p-text-muted-color);
+    background: var(--p-surface-100);
+  }
+}
+
+.roles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  min-height: 1.75rem;
+  align-items: center;
+}
+
+.required {
+  color: var(--p-red-500);
+}
+
+.error {
+  color: var(--p-red-500);
+}
+
+.hint {
+  color: var(--p-text-muted-color);
+}

@@ -18,6 +18,17 @@
   }
 }
 
+// Signed out (login page): no topbar / sidebar, the outlet takes the whole viewport.
+.app-shell--anonymous {
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr;
+  grid-template-areas: 'content';
+
+  .app-content {
+    padding: 0;
+  }
+}
+
 .app-topbar {
   grid-area: topbar;
   display: flex;
@@ -31,6 +42,31 @@
 .app-topbar__title {
   font-size: 1.05rem;
   font-weight: 600;
+}
+
+.app-topbar__spacer {
+  flex: 1;
+}
+
+.app-topbar__user {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.6rem;
+  border-radius: var(--p-border-radius-md, 6px);
+  font-size: 0.9rem;
+  color: var(--p-text-color);
+  text-decoration: none;
+
+  &:hover,
+  &--active {
+    background: var(--p-content-hover-background, var(--p-surface-100));
+  }
+}
+
+.app-topbar__user-hint {
+  font-size: 0.8rem;
+  color: var(--p-text-muted-color);
 }
 
 .app-sidebar {

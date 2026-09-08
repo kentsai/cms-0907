@@ -3,11 +3,17 @@
 Read this when choosing the next table to scaffold or when touching an existing feature's
 non-obvious behaviour. Specs live in `spec\{sub-system}\{Table}.md`; build with `/crud`.
 
-Totals as of 2026-09-08: **207 xUnit + 243 Karma** tests passing; `ng build` succeeds
+Totals as of 2026-09-08: **348 xUnit + 372 Karma** tests passing; `ng build` succeeds
 (the initial bundle exceeds the 500 kB budget *warning* because of PrimeNG shared chunks —
-not an error). All features below are committed and pushed on `develop` (latest `05941bc`).
+not an error). Everything through Login, JWT authorization, My Profile and Change Password
+(with token revocation) is committed on `develop`.
 
 ## Built
+
+Summary: PublishStatus, AppRole, AppUser, Partner, CourseGroup, Course (detail QR code,
+list in-place editing), Certification, the custom FeaturedPromoItem weekly board
+(`首頁 Home` menu), and Login + JWT authorization + My Profile + Change Password end-to-end
+(spec `spec\auth\Auth.md`). Details per feature follow.
 
 **PublishStatus** (`spec\admin\PublishStatus.md`) — first feature; introduced the
 RowAudit plumbing and the lookup endpoint pattern. Commit `9f2fd4c`.
@@ -74,6 +80,65 @@ models; create seeds it with SHA-256 of `SysConfig.appConfig.defaultPassword`; u
 never touches it; `POST /api/app-users/{id}/reset-password` re-applies the default
 (detail page has a 重設密碼 button). The `app-users` lookup lives in `AppUserRepository`.
 The lowercase-hex hash format is an assumption — no legacy hashes were available.
+
+**Login** (`POST /api/auth/login`; spec `spec\auth\Auth.md`, derived from the implementation) — body `{ userId, password }`;
+`AuthController` loads the `AppUser` row via `IAuthRepository.GetCredentialAsync`, then requires an
+**ordinal** `UserId` match (the DB lookup may be collation-insensitive), `IsActive = 1`, and a
+constant-time, hex-case-insensitive match of SHA-256(password) against `PasswordHash`. Any failure →
+**401** with the single generic body `{ "message": "帳號或密碼錯誤。" }` (`AuthController.InvalidCredentialsMessage`);
+roles and signing key are never queried on failure. Success → `{ userId, userName, accessToken }`
+(`LoginResponse`, no password member). The JWT (`JwtTokenIssuer`) is HS256 signed with
+`SysConfig.appConfig.symmetricSecurityKey` read at request time, expires 24 h after issue, and carries
+`sub`/`userId`/`userName` plus one `role` claim per `AppUserRole.RoleId`. Missing/short key → 500
+Problem (`系統設定錯誤`). Package: `System.IdentityModel.Tokens.Jwt` 8.22.0.
+
+**JWT authorization** (spec `spec\auth\Auth.md`) — every controller except `AuthController` requires a valid Bearer
+token (global `AuthorizeFilter`; missing/invalid/expired token or a token signed with another key → **401**
+with `WWW-Authenticate: Bearer`). Validation uses the same `SysConfig` key via `SigningKeyCache` (1-minute
+cache; DB failure keeps the last key, bad `appConfig` → 401 for everyone, never 500). RowAudit now records
+the `userId` claim as `UserName`. Frontend: `/login` page → profile in **sessionStorage** (`auth-profile`);
+`authInterceptor` adds the Bearer header and turns any 401 (except from login) into clear-session +
+`/login`; `authGuard` protects every other route (`/login?returnUrl=…`); the topbar shows the UserName and
+a `登出` button (clears sessionStorage, including remembered list filters); the `系統管理 Admin` menu group is
+only rendered when the token's roles include `Admin`. Tests: `JwtBearerAuthorizationTests` (in-memory host
+via `CmsApiFactory`), `SigningKeyCacheTests`; Karma specs for `AuthService`, interceptor, guard, JWT util,
+`LoginComponent` and the shell. Not built: role-based authorization on individual API endpoints (Admin-only
+menu is a UI convenience; the API only checks authentication), token refresh / expiry warning.
+
+**My Profile** (`/profile`, 個人資料; spec `spec\auth\Auth.md`) — `PUT /api/auth/profile` `{ userName }` updates the
+caller's own `AppUser.UserName`; the user comes **only** from the token's `userId` claim (the request type has
+no `UserId` / `RoleIds` member, so such JSON is ignored — an integration test posts them and checks the
+repository was called with the token user). UserName is trimmed; blank → 400, unknown user → 404. Login is
+now the only anonymous *action* (`[AllowAnonymous]` moved from the class to `Login`). The page shows UserId
+read-only, roles as read-only `p-tag`s from the token, and an editable UserName; save refreshes session
+storage and the topbar via `AuthService.updateProfile`. The topbar user name links to the page. The token's
+`userName` claim is not re-issued after a rename (nothing reads it server-side).
+
+**Change Password** (second card on `/profile`, 變更密碼; spec `spec\auth\Auth.md`) — `POST /api/auth/change-password`
+`{ currentPassword, newPassword, confirmNewPassword }` → **204**. `AuthController.ChangePassword` takes the
+user from the token, then in order: current password must hash to the stored `PasswordHash` (else 400
+`CurrentPassword` = `目前密碼錯誤。`, nothing written), new password must pass `Infrastructure\PasswordPolicy`
+(≥ 8 chars and ≥ 3 of upper / lower / digit / ASCII symbol; else 400 `NewPassword` = `PasswordPolicy.Message`),
+confirmation must equal it exactly (else 400 `ConfirmNewPassword`). Then
+`IAuthRepository.UpdatePasswordAsync(userId, SHA-256(new), TimeProvider.GetUtcNow())` sets `PasswordHash` +
+`PasswordUpdatedTime` and writes RowAudit `PasswordHash (changed by user)`; no row → 404. No hash crosses the
+API in either direction. Frontend: `AuthService.changePassword`, `core/utils/password.validator.ts`
+(`meetsPasswordPolicy` mirrors the API rule, `passwordPolicyValidator`, `passwordsMatchValidator`) and a
+bilingual policy message under the field; API field errors are pinned under the matching input.
+
+**A password change ends every session** — tokens carry `iat`; the bearer handler's `OnTokenValidated`
+(`ConfigureJwtBearerOptions`) loads the user's `PasswordUpdatedTime` through `PasswordStampCache` (singleton,
+per-user, 1-minute TTL, `IAuthRepository.GetPasswordStampAsync`) and fails the token when `iat` < that time
+at whole-second resolution (a login in the same second as the change is still accepted); a missing user row
+also fails; a DB error during the lookup is logged and the token kept. `ChangePassword` calls
+`IPasswordStampCache.Invalidate(userId)`, so the token that made the change is rejected on the very next
+request. Frontend: on 204 the profile page calls `AuthService.clear()` and navigates to
+`/login?reason=password-changed`; `LoginComponent` shows a bilingual info notice for that reason. Tests:
+`AuthControllerChangePasswordTests` (38 cases), `PasswordPolicyTests`, `PasswordStampCacheTests`,
+`JwtBearerAuthorizationTests` (token before/after the change, unknown user, DB failure, and an end-to-end
+change → old token 401 → old password 401 → new password logs in); Karma specs for the validator, the service
+call, the form (empty / weak / mismatch never call the API; success clears the session and redirects) and the
+login notice.
 
 ## Lookup endpoints (`/api/lookups/*`)
 

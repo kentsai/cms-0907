@@ -42,4 +42,36 @@ public class AppConfigJsonTests
 
         Assert.Contains("defaultPassword", ex.Message);
     }
+
+    // ---- symmetricSecurityKey (JWT signing secret) ----
+
+    [Fact]
+    public void ExtractSymmetricSecurityKey_ReturnsTheProperty()
+    {
+        const string json = """{ "defaultPassword": "Welcome123!", "symmetricSecurityKey": "s3cr3t-signing-key" }""";
+
+        Assert.Equal("s3cr3t-signing-key", AppConfigJson.ExtractSymmetricSecurityKey(json));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    public void ExtractSymmetricSecurityKey_Throws_WhenConfigRowMissing(string? json)
+    {
+        var ex = Assert.Throws<AppConfigException>(() => AppConfigJson.ExtractSymmetricSecurityKey(json));
+
+        Assert.Contains("appConfig", ex.Message);
+    }
+
+    [Theory]
+    [InlineData("""{ "defaultPassword": "Welcome123!" }""")]
+    [InlineData("""{ "symmetricSecurityKey": "" }""")]
+    [InlineData("""{ "symmetricSecurityKey": 42 }""")]
+    public void ExtractSymmetricSecurityKey_Throws_WhenPropertyMissingOrNotAString(string json)
+    {
+        var ex = Assert.Throws<AppConfigException>(() => AppConfigJson.ExtractSymmetricSecurityKey(json));
+
+        Assert.Contains("symmetricSecurityKey", ex.Message);
+        Assert.DoesNotContain("defaultPassword", ex.Message);
+    }
 }
