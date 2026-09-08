@@ -52,14 +52,14 @@ describe('AppRoleDetailComponent', () => {
     lookup = jasmine.createSpyObj<LookupService>('LookupService', ['appUsers']);
     lookup.appUsers.and.returnValue(of([{ id: 'helen', label: 'helen (helen)' }]));
 
-    rowAudits = jasmine.createSpyObj<RowAuditService>('RowAuditService', ['getForRow']);
-    rowAudits.getForRow.and.returnValue(of([]));
+    rowAudits = jasmine.createSpyObj<RowAuditService>('RowAuditService', ['getForRecord']);
+    rowAudits.getForRecord.and.returnValue(of([]));
   });
 
   it('loads the role by the string :id route param', async () => {
     await setup('Admin');
     expect(service.getById).toHaveBeenCalledWith('Admin');
-    expect(rowAudits.getForRow).toHaveBeenCalledWith('AppRole', 'Admin', 1);
+    expect(rowAudits.getForRecord).toHaveBeenCalledWith('AppRole', 'Admin');
   });
 
   it('renders the role fields', async () => {

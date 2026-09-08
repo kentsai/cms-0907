@@ -4,7 +4,7 @@
       <h1>課程</h1>
       @if (item(); as it) {
         <span class="toolbar-title__sub">{{ it.pkid }}　{{ it.courseId }}　{{ it.title }}</span>
-        <app-row-audit-badge tableName="Course" [pk]="it.pkid" />
+        <app-row-audit-badge tableName="Course" [pkid]="it.pkid" />
       }
     </div>
   </ng-template>

@@ -4,7 +4,7 @@
       <div class="toolbar-title">
         <h1>{{ title }}</h1>
         @if (isEdit && roleId !== null) {
-          <app-row-audit-badge tableName="AppRole" [pk]="roleId" />
+          <app-row-audit-badge tableName="AppRole" [pkid]="roleId" />
         }
       </div>
     </ng-template>

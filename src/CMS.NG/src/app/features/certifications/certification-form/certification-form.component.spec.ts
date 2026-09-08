@@ -60,8 +60,8 @@ describe('CertificationFormComponent', () => {
     lookup.courses.and.returnValue(of([{ pkid: 10, label: 'AZ-104 Azure 管理員' }, { pkid: 11, label: 'CCNA CCNA 認證班' }]));
     lookup.jobCategories.and.returnValue(of([{ pkid: 1, label: '系統管理' }, { pkid: 2, label: '網路' }]));
 
-    rowAudits = jasmine.createSpyObj<RowAuditService>('RowAuditService', ['getForRow']);
-    rowAudits.getForRow.and.returnValue(of([]));
+    rowAudits = jasmine.createSpyObj<RowAuditService>('RowAuditService', ['getForRecord']);
+    rowAudits.getForRecord.and.returnValue(of([]));
   });
 
   describe('new mode', () => {
@@ -177,7 +177,7 @@ describe('CertificationFormComponent', () => {
 
       expect(text).toContain('編輯認證');
       expect(text).toContain('主代碼 1');
-      expect(rowAudits.getForRow).toHaveBeenCalledWith('Certification', 1, 1);
+      expect(rowAudits.getForRecord).toHaveBeenCalledWith('Certification', 1);
     });
   });
 });

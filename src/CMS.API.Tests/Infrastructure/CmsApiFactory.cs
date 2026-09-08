@@ -25,6 +25,7 @@ public sealed class CmsApiFactory : WebApplicationFactory<Program>
 
     public Mock<IAuthRepository> AuthRepository { get; } = new(MockBehavior.Strict);
     public Mock<IPublishStatusRepository> PublishStatusRepository { get; } = new(MockBehavior.Strict);
+    public Mock<IRowAuditRepository> RowAuditRepository { get; } = new(MockBehavior.Strict);
 
     public CmsApiFactory()
     {
@@ -79,6 +80,9 @@ public sealed class CmsApiFactory : WebApplicationFactory<Program>
 
             services.RemoveAll<IPublishStatusRepository>();
             services.AddSingleton(PublishStatusRepository.Object);
+
+            services.RemoveAll<IRowAuditRepository>();
+            services.AddSingleton(RowAuditRepository.Object);
         });
     }
 }

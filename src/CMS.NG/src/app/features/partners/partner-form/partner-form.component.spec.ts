@@ -60,8 +60,8 @@ describe('PartnerFormComponent', () => {
     service.create.and.returnValue(of({ ...existing, pkid: 5, name: 'Cisco' }));
     service.update.and.returnValue(of(void 0));
 
-    rowAudits = jasmine.createSpyObj<RowAuditService>('RowAuditService', ['getForRow']);
-    rowAudits.getForRow.and.returnValue(of([]));
+    rowAudits = jasmine.createSpyObj<RowAuditService>('RowAuditService', ['getForRecord']);
+    rowAudits.getForRecord.and.returnValue(of([]));
   });
 
   describe('new mode', () => {
@@ -173,7 +173,7 @@ describe('PartnerFormComponent', () => {
 
       expect(text).toContain('編輯合作夥伴');
       expect(text).toContain('主代碼 1');
-      expect(rowAudits.getForRow).toHaveBeenCalledWith('Partner', 1, 1);
+      expect(rowAudits.getForRecord).toHaveBeenCalledWith('Partner', 1);
     });
   });
 });

@@ -7,11 +7,14 @@ import { RowAudit } from '@core/models/row-audit.model';
 @Injectable({ providedIn: 'root' })
 export class RowAuditService {
   private readonly http = inject(HttpClient);
-  private readonly baseUrl = `${environment.apiBaseUrl}/row-audits`;
+  private readonly url = `${environment.apiBaseUrl}/row-audits`;
 
-  /** Audit rows for one record, newest first. */
-  getForRow(tableName: string, primaryKeyValues: string | number, take = 20): Observable<RowAudit[]> {
-    const url = `${this.baseUrl}/${encodeURIComponent(tableName)}/${encodeURIComponent(String(primaryKeyValues))}`;
-    return this.http.get<RowAudit[]>(url, { params: new HttpParams().set('take', take) });
+  /**
+   * The full audit trail of one record, newest first. `pkid` is whatever the writer stored as
+   * `PrimaryKeyValues`: the numeric pkid, or the string key of AppRole (`RoleId`) / AppUser (`UserId`).
+   */
+  getForRecord(tableName: string, pkid: string | number): Observable<RowAudit[]> {
+    const params = new HttpParams().set('tableName', tableName).set('pkid', String(pkid));
+    return this.http.get<RowAudit[]>(this.url, { params });
   }
 }

@@ -59,8 +59,8 @@ describe('AppUserFormComponent', () => {
     lookup = jasmine.createSpyObj<LookupService>('LookupService', ['appRoles']);
     lookup.appRoles.and.returnValue(of([{ id: 'Admin', label: 'Administrator' }, { id: 'Editor', label: 'Editor' }]));
 
-    rowAudits = jasmine.createSpyObj<RowAuditService>('RowAuditService', ['getForRow']);
-    rowAudits.getForRow.and.returnValue(of([]));
+    rowAudits = jasmine.createSpyObj<RowAuditService>('RowAuditService', ['getForRecord']);
+    rowAudits.getForRecord.and.returnValue(of([]));
   });
 
   describe('new mode', () => {
@@ -156,7 +156,7 @@ describe('AppUserFormComponent', () => {
 
       expect(text).toContain('編輯使用者');
       expect(text).not.toContain('新使用者的密碼');
-      expect(rowAudits.getForRow).toHaveBeenCalledWith('AppUser', 'helen', 1);
+      expect(rowAudits.getForRecord).toHaveBeenCalledWith('AppUser', 'helen');
     });
   });
 });

@@ -4,7 +4,7 @@
       <h1>課程群組</h1>
       @if (item(); as it) {
         <span class="toolbar-title__sub">{{ it.pkid }}　{{ it.description }}</span>
-        <app-row-audit-badge tableName="CourseGroup" [pk]="it.pkid" />
+        <app-row-audit-badge tableName="CourseGroup" [pkid]="it.pkid" />
       }
     </div>
   </ng-template>

@@ -210,12 +210,13 @@ the repository and surfaced as `EntityInUseException` → controller returns 409
 
 ### RowAudit
 
-Uses the existing `IRowAuditWriter` on the **same open connection/transaction**:
+Uses `IRowAuditWriter.LogInsertAsync / LogUpdateAsync / LogDeleteAsync` on the **same open
+connection/transaction** (the row is reloaded after the change for the after-image):
 
 | Action | `TableName` | `PrimaryKeyValues` | `ActionType` | `ActionDesc` |
 |--------|-------------|--------------------|--------------|--------------|
 | Create | `CourseGroup` | new `pkid` | `INSERT` | `Description` |
-| Update | `CourseGroup` | `pkid` | `UPDATE` | comma-separated changed column names (`AuditHelper.ChangedColumns`) |
+| Update | `CourseGroup` | `pkid` | `UPDATE` | comma-separated changed column names; no row when nothing changed |
 | Delete | `CourseGroup` | `pkid` | `DELETE` | `Description` of the deleted row |
 
 ### Special Column Notes
@@ -297,7 +298,7 @@ No FK columns → no lookups to load. `forkJoin` is not needed on the list page.
 ### Detail page (`features/course-groups/course-group-detail/`)
 
 - Sticky `p-toolbar`: `#start` = title 課程群組 + `pkid　Description` subtitle +
-  `RowAuditBadgeComponent` (`tableName="CourseGroup"`, `pk=pkid`); `#end` = 返回, 編輯, 刪除.
+  `RowAuditBadgeComponent` (`tableName="CourseGroup"`, `[pkid]="pkid"`); `#end` = 返回, 編輯, 刪除.
 - Card 群組資料 with a label/value grid for the two columns.
 - Card 相關資料 with both Primary-Foreign link buttons.
 

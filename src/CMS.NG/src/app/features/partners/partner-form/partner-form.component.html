@@ -5,7 +5,7 @@
         <h1>{{ title }}</h1>
         @if (isEdit && pkid !== null) {
           <span class="toolbar-title__sub">主代碼 {{ pkid }}</span>
-          <app-row-audit-badge tableName="Partner" [pk]="pkid" />
+          <app-row-audit-badge tableName="Partner" [pkid]="pkid" />
         }
       </div>
     </ng-template>

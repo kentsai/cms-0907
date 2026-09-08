@@ -276,10 +276,9 @@ SET Partner_pkid = @PartnerPkid,
 WHERE pkid = @Pkid;
 ```
 
-Reads the existing row first (same transaction) → 404 when missing; resyncs both junctions;
-audit description = changed scalar columns (`AuditHelper.ChangedColumns` against a scalar-only
-parameter object) plus `CoursePkids` / `JobCategoryPkids` when the normalised id sets differ;
-`(no changes)` when nothing differs.
+Reads the existing row first (same transaction) → 404 when missing; resyncs both junctions; reloads the
+row and audits the diff of the two snapshots (`LogUpdateAsync`): changed scalar columns plus `CoursePkids` /
+`JobCategoryPkids` when the id sets differ; no audit row when nothing differs.
 
 ### SQL — DELETE
 
@@ -300,13 +299,14 @@ identical in shape to `CourseRepository.SyncCertificationsAsync`.
 
 ### RowAudit
 
-`IRowAuditWriter` on the same open connection/transaction:
+`IRowAuditWriter.LogInsertAsync / LogUpdateAsync / LogDeleteAsync` on the same open connection/transaction
+(`PartnerName` is `[AuditIgnore]`d on the model):
 
 | Action | `TableName` | `PrimaryKeyValues` | `ActionType` | `ActionDesc` |
 |--------|-------------|--------------------|--------------|--------------|
-| Create | `Certification` | new `pkid` | `INSERT` | trimmed `Title`, or `(無名稱)` when null |
-| Update | `Certification` | `pkid` | `UPDATE` | comma-separated changed members, or `(no changes)` |
-| Delete | `Certification` | `pkid` | `DELETE` | `Title` of the deleted row, or `(無名稱)` |
+| Create | `Certification` | new `pkid` | `INSERT` | trimmed `Title` (NULL when untitled) |
+| Update | `Certification` | `pkid` | `UPDATE` | comma-separated changed members; no row when nothing changed |
+| Delete | `Certification` | `pkid` | `DELETE` | `Title` of the deleted row (NULL when untitled) |
 
 ### Special Column Notes
 
@@ -399,7 +399,7 @@ FK label comes on the row (`partnerName`). The three lookups only feed the filte
 ### Detail page (`features/certifications/certification-detail/`)
 
 - Sticky `p-toolbar`: `#start` = 認證 + `pkid　partnerName　title` subtitle +
-  `RowAuditBadgeComponent` (`tableName="Certification"`, `[pk]="pkid"`); `#end` = 返回, 編輯, 刪除.
+  `RowAuditBadgeComponent` (`tableName="Certification"`, `[pkid]="pkid"`); `#end` = 返回, 編輯, 刪除.
 - `forkJoin` of `getById`, `lookup.courses()`, `lookup.jobCategories()`.
 - Card 基本資料: 主代碼, 原廠 (link `a.fk-link` → `/course/partners/{partnerPkid}`), 認證名稱 (— when null).
 - Card 課程與職務類別: 對應課程 and 職務類別 label lists joined by 、 (fallback `#pkid`, empty → —).

@@ -61,8 +61,8 @@ describe('AppRoleFormComponent', () => {
       { id: 'miles', label: 'Miles Sun (miles@uuu.com.tw)' }
     ]));
 
-    rowAudits = jasmine.createSpyObj<RowAuditService>('RowAuditService', ['getForRow']);
-    rowAudits.getForRow.and.returnValue(of([]));
+    rowAudits = jasmine.createSpyObj<RowAuditService>('RowAuditService', ['getForRecord']);
+    rowAudits.getForRecord.and.returnValue(of([]));
   });
 
   describe('new mode', () => {
@@ -173,7 +173,7 @@ describe('AppRoleFormComponent', () => {
       const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
 
       expect(text).toContain('編輯角色');
-      expect(rowAudits.getForRow).toHaveBeenCalledWith('AppRole', 'Admin', 1);
+      expect(rowAudits.getForRecord).toHaveBeenCalledWith('AppRole', 'Admin');
     });
   });
 });

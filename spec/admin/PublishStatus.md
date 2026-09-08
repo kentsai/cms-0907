@@ -244,15 +244,16 @@ calls it on the **same open connection**:
 | Action | `TableName` | `PrimaryKeyValues` | `ActionType` | `ActionDesc` |
 |--------|-------------|--------------------|--------------|--------------|
 | Create | `PublishStatus` | `pkid` | `INSERT` | `Description` |
-| Update | `PublishStatus` | `pkid` | `UPDATE` | comma-separated changed column names |
+| Update | `PublishStatus` | `pkid` | `UPDATE` | comma-separated changed column names; no row when nothing changed |
 | Delete | `PublishStatus` | `pkid` | `DELETE` | `Description` of the deleted row |
 
-`UserName` = `HttpContext.User.Identity.Name` if authenticated, else `"system"` (no auth
-in this scaffold). `DateTime` = `GETUTCDATE()` — display with `+ 'Z'` on the frontend.
+Now written through the generic `LogInsertAsync / LogUpdateAsync / LogDeleteAsync` (row reloaded after the change
+for the after-image). `UserName` = the JWT `userName` claim, `"system"` when unauthenticated; `DateTime` =
+`TimeProvider.GetUtcNow()` (UTC) — display with `+ 'Z'` on the frontend. See `spec\auth\Auth.md`.
 
-A read endpoint `GET /api/row-audits/{tableName}/{primaryKeyValues}` (new
-`RowAuditsController`) returns the audit rows newest-first so the frontend badge can show
-"last changed by / when".
+A read endpoint `GET /api/row-audits?tableName=&pkid=` (new `RowAuditsController`) returns the
+record's full audit trail newest-first (`DateTime`, `UserName`, `ActionType`, `ActionDesc`) so the
+frontend 異動紀錄 History badge can show the latest entry inline and the whole trail in a dialog.
 
 ### Special Column Notes
 

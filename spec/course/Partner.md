@@ -270,12 +270,14 @@ PartnerCourseGroup / Seminar / Promotion2) is caught in the repository and surfa
 
 ### RowAudit
 
-Uses the existing `IRowAuditWriter` on the **same open connection/transaction**:
+Uses `IRowAuditWriter.LogInsertAsync / LogUpdateAsync / LogDeleteAsync` on the **same open
+connection/transaction** (the row is reloaded after the change for the after-image; covered by
+`Tests\Repositories\PartnerRepositoryTests`):
 
 | Action | `TableName` | `PrimaryKeyValues` | `ActionType` | `ActionDesc` |
 |--------|-------------|--------------------|--------------|--------------|
 | Create | `Partner` | new `pkid` | `INSERT` | `Name` |
-| Update | `Partner` | `pkid` | `UPDATE` | comma-separated changed column names (`AuditHelper.ChangedColumns`) |
+| Update | `Partner` | `pkid` | `UPDATE` | comma-separated changed column names; no row when nothing changed |
 | Delete | `Partner` | `pkid` | `DELETE` | `Name` of the deleted row |
 
 ### Special Column Notes
@@ -365,7 +367,7 @@ No FK columns → no lookups to load. `forkJoin` is not needed on the list page.
 ### Detail page (`features/partners/partner-detail/`)
 
 - Sticky `p-toolbar`: `#start` = title 合作夥伴 + `pkid　Name` subtitle +
-  `RowAuditBadgeComponent` (`tableName="Partner"`, `pk=pkid`); `#end` = 返回, 編輯, 刪除.
+  `RowAuditBadgeComponent` (`tableName="Partner"`, `[pkid]="pkid"`); `#end` = 返回, 編輯, 刪除.
 - Card 夥伴資料 with a label/value grid for the seven columns (`ImageFilename` shows
   `—` when null).
 - Card 相關資料 with all five Primary-Foreign link buttons.

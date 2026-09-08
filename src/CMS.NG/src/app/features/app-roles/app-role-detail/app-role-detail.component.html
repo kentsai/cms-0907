@@ -4,7 +4,7 @@
       <h1>角色</h1>
       @if (item(); as it) {
         <span class="toolbar-title__sub">{{ it.roleId }}　{{ it.roleName }}</span>
-        <app-row-audit-badge tableName="AppRole" [pk]="it.roleId" />
+        <app-row-audit-badge tableName="AppRole" [pkid]="it.roleId" />
       }
     </div>
   </ng-template>

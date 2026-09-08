@@ -44,8 +44,8 @@ describe('PublishStatusFormComponent', () => {
     service.create.and.returnValue(of({ ...existing, pkid: 5 }));
     service.update.and.returnValue(of(void 0));
 
-    rowAudits = jasmine.createSpyObj<RowAuditService>('RowAuditService', ['getForRow']);
-    rowAudits.getForRow.and.returnValue(of([]));
+    rowAudits = jasmine.createSpyObj<RowAuditService>('RowAuditService', ['getForRecord']);
+    rowAudits.getForRecord.and.returnValue(of([]));
   });
 
   describe('new mode', () => {
@@ -153,7 +153,7 @@ describe('PublishStatusFormComponent', () => {
       const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
 
       expect(text).toContain('編輯發布狀態');
-      expect(rowAudits.getForRow).toHaveBeenCalledWith('PublishStatus', 1, 1);
+      expect(rowAudits.getForRecord).toHaveBeenCalledWith('PublishStatus', 1);
     });
   });
 });

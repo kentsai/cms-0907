@@ -4,7 +4,7 @@
       <h1>發布狀態</h1>
       @if (item(); as it) {
         <span class="toolbar-title__sub">{{ it.pkid }}　{{ it.description }}</span>
-        <app-row-audit-badge tableName="PublishStatus" [pk]="it.pkid" />
+        <app-row-audit-badge tableName="PublishStatus" [pkid]="it.pkid" />
       }
     </div>
   </ng-template>

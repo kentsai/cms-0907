@@ -1,10 +1,10 @@
-/** Row of dbo.RowAudit as returned by /api/row-audits/{table}/{pk}. `dateTime` is UTC without a 'Z' suffix. */
+/**
+ * One entry of a record's audit trail as returned by `GET /api/row-audits?tableName=&pkid=`.
+ * `dateTime` is UTC without a 'Z' suffix (SQL `datetime`); `toUtcIso` in the badge appends it before formatting.
+ */
 export interface RowAudit {
-  pkid: number;
-  tableName: string;
+  dateTime: string;
   userName: string;
-  primaryKeyValues: string;
   actionType: 'INSERT' | 'UPDATE' | 'DELETE' | string;
   actionDesc: string | null;
-  dateTime: string;
 }

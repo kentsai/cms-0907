@@ -21,10 +21,30 @@ src\
 - `Infrastructure\IDbConnectionFactory` — repositories call `CreateOpenConnectionAsync`.
   Dapper only, no EF. Everything async with `CancellationToken` flowed through.
 - `Infrastructure\RowAuditWriter.cs` (`IRowAuditWriter`) writes `dbo.RowAudit` on the
-  caller's connection/transaction. User name is `User.Identity.Name` — the JWT `userId` claim —
-  and falls back to `"system"` when unauthenticated.
-- `Infrastructure\AuditHelper.ChangedColumns` diffs a model against a request by property
-  name for UPDATE audit descriptions.
+  caller's connection/transaction. **Every CRUD repository uses the generic entry points**, inside the
+  change's own transaction, so a failed or rolled-back statement leaves no audit row:
+  Create = INSERT → reload the row by key → `LogInsertAsync(conn, table, created, ct, tx)`;
+  Update = load the row (before) → UPDATE (+ junction syncs) → reload (after) →
+  `LogUpdateAsync(conn, table, before, after, ct, tx)`; Delete = load → DELETE →
+  `LogDeleteAsync(conn, table, existing, ct, tx)`. `PrimaryKeyValues` = the entity's `[AuditKey]` property when
+  it has one (AppRole `RoleId`, AppUser `UserId` — the badge looks rows up by that key), else `pkid`
+  (case-insensitive; throws if absent). INSERT/DELETE `ActionDesc` = the first `string` property in declaration
+  order (key and `[AuditIgnore]` members skipped); UPDATE `ActionDesc` = `", "`-joined changed property names,
+  **no row when nothing changed**. Mark JOINed labels / subquery counts on response models `[AuditIgnore]`
+  (`Infrastructure\AuditAttributes.cs`) so they never enter the diff; N-N pkid lists are loaded sorted by
+  `GetByIdAsync`, so a membership change is listed as e.g. `CertificationPkids`. The low-level
+  `WriteAsync(conn, table, pk, actionType, desc, ct, tx?)` remains for custom descriptions only (AppUser password
+  reset, Auth profile / password change, FeaturedPromoItem slot swap). `ActionType` constants `INSERT` / `UPDATE` /
+  `DELETE`; `UserName` = the JWT `userName` claim (fallback `Identity.Name` = `userId`), `"system"` when
+  unauthenticated; `DateTime` = `TimeProvider.GetUtcNow()` (UTC, the frontend appends `'Z'`); every column is
+  truncated to its width (`ActionDesc` 1000). Tests: `RowAuditWriterTests`, `Repositories\PartnerRepositoryTests`
+  and `CourseRepositoryTests` run on `Tests\Infrastructure\RecordingDbConnection` — an always-open `DbConnection`
+  that records every Dapper command (text / parameters / transaction) and answers it through `OnQuery` (return
+  `ListDataReader.Of(rows)`; `Of<T>()` for no rows), `OnScalar` and `OnExecute` (throw from a responder to
+  simulate a failed statement) — handed out by `RecordingConnectionFactory`. Repository tests need no SQL Server.
+- `Infrastructure\AuditHelper.ChangedColumns` diffs two objects by property name for UPDATE audit
+  descriptions (non-string sequences compare element-wise, so equal pkid lists are not reported as
+  changed; `[AuditIgnore]` properties are skipped).
 - `Infrastructure\EntityInUseException` — repositories throw it on SQL error 547 (FK
   violation); controllers return 409.
 - `Infrastructure\PasswordHasher` (SHA-256 → lowercase hex) and
@@ -90,9 +110,17 @@ src\
 - `Infrastructure\WeekRange` snaps a `DateOnly` to its Monday–Sunday week (FeaturedPromoItem
   board). `Infrastructure\SlotOccupiedException` is the unique-key (2627/2601) counterpart of
   `EntityInUseException`; controllers return 409 for both.
-- `Controllers\RowAuditsController` (`GET /api/row-audits/{table}/{pk}`) feeds the
-  row-audit badge on the frontend.
-- Dapper 2.1.79 maps `DateOnly` natively — no type handler in `Program.cs`.
+- `Controllers\RowAuditsController` (`GET /api/row-audits?tableName=&pkid=`, both required → 400
+  `ValidationProblem`) returns the record's **full** audit trail newest first (`ORDER BY [DateTime] DESC, pkid
+  DESC`) as `Models\RowAudit` = `{ dateTime, userName, actionType, actionDesc }` only, via
+  `IRowAuditRepository.GetForRecordAsync(tableName, pkid)`. `pkid` is matched as text against
+  `PrimaryKeyValues`, so it is the numeric pkid or the `[AuditKey]` string (`RoleId` / `UserId`). Tests:
+  `RowAuditsControllerTests`, `Repositories\RowAuditRepositoryTests` (recording connection),
+  `Infrastructure\RowAuditsEndpointTests` (through `CmsApiFactory`, which now also mocks `IRowAuditRepository`).
+- Dapper 2.1.79 has **no** `DateOnly` mapping (its net8.0 build never references the type): without a handler
+  every `date` parameter throws `NotSupportedException` and reads into `DateOnly` fail.
+  `Infrastructure\DapperTypeHandlers.Register()` registers one (module initialiser, so tests get it too;
+  `Program.cs` also calls it explicitly).
 - `Program.cs` ends with `public partial class Program;` so tests can reference it.
 - CORS policy `LocalhostCorsPolicy` allows any loopback origin (`uri.IsLoopback`).
 - Swagger: **Swashbuckle 7.2.0**, pinned. `Microsoft.AspNetCore.OpenApi` / `AddOpenApi`
@@ -102,7 +130,13 @@ src\
 ## Frontend (`src\CMS.NG\src\app`)
 
 - `core/services/lookup.service.ts` — one method per lookup endpoint.
-- `core/components/row-audit-badge` — shown in detail/edit toolbars (`#start` slot).
+- `core/components/row-audit-badge` (`<app-row-audit-badge tableName="Course" [pkid]="it.pkid" />`) — the
+  異動紀錄 History button in every detail / edit toolbar (`#start` slot; forms only in edit mode). Loads the trail
+  once through `RowAuditService.getForRecord(tableName, pkid)`, shows the newest entry inline
+  (`Update by alice · 2026-06-04 14:30`, `尚無異動紀錄 No history`, or `無法載入 Unavailable`) and opens a
+  `p-dialog` with the full trail (`p-table`: 時間 / 使用者 / 動作 tag / 說明, `尚無異動紀錄 No history yet` when
+  empty). Renders nothing without a `pkid`. `toUtcIso` appends `'Z'` to the offset-less UTC `dateTime`. Page
+  specs mock `RowAuditService.getForRecord` and assert `Update by system` in the toolbar.
 - `core/components/qr-code` (`app-qr-code`) — `text` / `title` / `fileName` / `size` inputs;
   renders via `core/services/qr-code.service.ts` (wraps the `qrcode` npm package, listed in
   `angular.json` `allowedCommonJsDependencies`). Spy on `QrCodeService.prototype.toCanvas`

@@ -94,8 +94,8 @@ describe('CourseFormComponent', () => {
     lookup.certifications.and.returnValue(of([{ pkid: 5, label: 'Microsoft Azure Administrator Associate' }]));
     lookup.jobCategories.and.returnValue(of([{ pkid: 1, label: '系統管理' }, { pkid: 2, label: '網路' }]));
 
-    rowAudits = jasmine.createSpyObj<RowAuditService>('RowAuditService', ['getForRow']);
-    rowAudits.getForRow.and.returnValue(of([]));
+    rowAudits = jasmine.createSpyObj<RowAuditService>('RowAuditService', ['getForRecord']);
+    rowAudits.getForRecord.and.returnValue(of([]));
   });
 
   describe('new mode', () => {
@@ -282,7 +282,7 @@ describe('CourseFormComponent', () => {
 
       expect(text).toContain('編輯課程');
       expect(text).toContain('主代碼 1');
-      expect(rowAudits.getForRow).toHaveBeenCalledWith('Course', 1, 1);
+      expect(rowAudits.getForRecord).toHaveBeenCalledWith('Course', 1);
     });
   });
 });

@@ -104,7 +104,10 @@ Build in this order:
    - Dapper only. Multi-map for FK nav objects.
    - `nchar` columns: `RTRIM()` in all SELECTs.
    - n-n: delete-then-reinsert on update; separate query on same connection for read.
-   - Inject `RowAuditWriter`; log on INSERT / UPDATE / DELETE.
+   - Inject `IRowAuditWriter`; load → change → reload → `LogInsertAsync` /
+     `LogUpdateAsync(before, after)` / `LogDeleteAsync` on the change's transaction (see
+     `docs\claude\feature-infrastructure.md`). `[AuditIgnore]` JOINed labels / counts on the
+     model; `[AuditKey]` the key of a string-keyed table.
 4. **Controller** — `{API_PROJECT}/Controllers/{TABLE}sController.cs`
    (pluralize correctly — check existing controllers for the pattern)
 5. **Register** — add `I{TABLE}Repository` / `{TABLE}Repository` to `Program.cs`
@@ -120,11 +123,12 @@ Build in this order:
    - Filter drawer with all query fields from spec
    - `confirmDelete` message includes the record's PK and display name
 9. **Detail component** — `{NG_PROJECT}/src/app/features/{table-plural}/{table-kebab}-detail/`
-   - `RowAuditBadgeComponent` in toolbar `#start`
+   - `RowAuditBadgeComponent` in toolbar `#start` (`tableName="{Table}"`, `[pkid]="it.pkid"` — or the
+     `[AuditKey]` string key for string-keyed tables); the spec mocks `RowAuditService.getForRecord`
    - Primary-Foreign link buttons if spec has them
 10. **Form component** — `{NG_PROJECT}/src/app/features/{table-plural}/{table-kebab}-form/`
     - Reactive Forms; `forkJoin` for parallel lookups; sticky `p-toolbar`
-    - `RowAuditBadgeComponent` in toolbar `#start`
+    - `RowAuditBadgeComponent` in toolbar `#start` (edit mode only, same inputs as the detail page)
 11. **Lazy route** — add to `{NG_PROJECT}/src/app/app.routes.ts`
     (route order: `/new` before `/:id`)
 12. **Sidebar entry** — add to `{NG_PROJECT}/src/app/app.html` and `app.ts` under

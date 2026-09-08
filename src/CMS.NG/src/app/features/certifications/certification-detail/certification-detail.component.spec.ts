@@ -52,9 +52,9 @@ describe('CertificationDetailComponent', () => {
     lookup.courses.and.returnValue(of([{ pkid: 10, label: 'AZ-104 Azure 管理員' }]));
     lookup.jobCategories.and.returnValue(of([{ pkid: 1, label: '系統管理' }]));
 
-    rowAudits = jasmine.createSpyObj<RowAuditService>('RowAuditService', ['getForRow']);
-    rowAudits.getForRow.and.returnValue(of([
-      { pkid: 9, tableName: 'Certification', userName: 'system', primaryKeyValues: '1', actionType: 'UPDATE', actionDesc: 'Title', dateTime: '2026-09-08T01:02:03' }
+    rowAudits = jasmine.createSpyObj<RowAuditService>('RowAuditService', ['getForRecord']);
+    rowAudits.getForRecord.and.returnValue(of([
+      { dateTime: '2026-09-08T01:02:03', userName: 'system', actionType: 'UPDATE', actionDesc: 'Title' }
     ]));
   });
 
@@ -99,8 +99,8 @@ describe('CertificationDetailComponent', () => {
     await fixture.whenStable();
     fixture.detectChanges();
 
-    expect(rowAudits.getForRow).toHaveBeenCalledWith('Certification', 1, 1);
-    expect((fixture.nativeElement as HTMLElement).textContent).toContain('最後異動 system');
+    expect(rowAudits.getForRecord).toHaveBeenCalledWith('Certification', 1);
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Update by system');
   });
 
   it('shows a not-found message on 404', async () => {

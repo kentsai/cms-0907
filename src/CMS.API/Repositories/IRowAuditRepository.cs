@@ -4,6 +4,9 @@ namespace CMS.API.Repositories;
 
 public interface IRowAuditRepository
 {
-    /// <summary>Audit rows for one record, newest first, capped at <paramref name="take"/>.</summary>
-    Task<IReadOnlyList<RowAudit>> GetForRowAsync(string tableName, string primaryKeyValues, int take, CancellationToken cancellationToken);
+    /// <summary>
+    /// The full audit trail of one record — every <c>dbo.RowAudit</c> row whose <c>TableName</c> is
+    /// <paramref name="tableName"/> and whose <c>PrimaryKeyValues</c> is <paramref name="pkid"/> — newest first.
+    /// </summary>
+    Task<IReadOnlyList<RowAudit>> GetForRecordAsync(string tableName, string pkid, CancellationToken cancellationToken);
 }

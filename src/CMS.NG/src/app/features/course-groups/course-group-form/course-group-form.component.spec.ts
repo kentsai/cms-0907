@@ -45,8 +45,8 @@ describe('CourseGroupFormComponent', () => {
     service.create.and.returnValue(of({ pkid: 5, description: '資訊安全' }));
     service.update.and.returnValue(of(void 0));
 
-    rowAudits = jasmine.createSpyObj<RowAuditService>('RowAuditService', ['getForRow']);
-    rowAudits.getForRow.and.returnValue(of([]));
+    rowAudits = jasmine.createSpyObj<RowAuditService>('RowAuditService', ['getForRecord']);
+    rowAudits.getForRecord.and.returnValue(of([]));
   });
 
   describe('new mode', () => {
@@ -122,7 +122,7 @@ describe('CourseGroupFormComponent', () => {
 
       expect(text).toContain('編輯課程群組');
       expect(text).toContain('主代碼 1');
-      expect(rowAudits.getForRow).toHaveBeenCalledWith('CourseGroup', 1, 1);
+      expect(rowAudits.getForRecord).toHaveBeenCalledWith('CourseGroup', 1);
     });
   });
 });

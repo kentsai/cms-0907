@@ -3,7 +3,7 @@
 Read this when choosing the next table to scaffold or when touching an existing feature's
 non-obvious behaviour. Specs live in `spec\{sub-system}\{Table}.md`; build with `/crud`.
 
-Totals as of 2026-09-08: **369 xUnit + 393 Karma** tests passing; `ng build` succeeds
+Totals as of 2026-09-08: **433 xUnit + 406 Karma** tests passing; `ng build` succeeds
 (the initial bundle exceeds the 500 kB budget *warning* because of PrimeNG shared chunks —
 not an error). Everything through Login, JWT authorization, My Profile, Change Password
 (with token revocation) and the forced change for default-password logins is on `develop`.
@@ -95,8 +95,8 @@ Problem (`系統設定錯誤`). Package: `System.IdentityModel.Tokens.Jwt` 8.22.
 **JWT authorization** (spec `spec\auth\Auth.md`) — every controller except `AuthController` requires a valid Bearer
 token (global `AuthorizeFilter`; missing/invalid/expired token or a token signed with another key → **401**
 with `WWW-Authenticate: Bearer`). Validation uses the same `SysConfig` key via `SigningKeyCache` (1-minute
-cache; DB failure keeps the last key, bad `appConfig` → 401 for everyone, never 500). RowAudit now records
-the `userId` claim as `UserName`. Frontend: `/login` page → profile in **sessionStorage** (`auth-profile`);
+cache; DB failure keeps the last key, bad `appConfig` → 401 for everyone, never 500). RowAudit records
+the `userName` claim as `UserName` (fallback `userId`; see the generic writer below). Frontend: `/login` page → profile in **sessionStorage** (`auth-profile`);
 `authInterceptor` adds the Bearer header and turns any 401 (except from login) into clear-session +
 `/login`; `authGuard` protects every other route (`/login?returnUrl=…`); the topbar shows the UserName and
 a `登出` button (clears sessionStorage, including remembered list filters); the `系統管理 Admin` menu group is
@@ -161,6 +161,33 @@ no flag / ordinal / 500 / never read on failure), `JwtTokenIssuerTests`, `Passwo
 change → old token 401 → new login unflagged, expired flagged token is 401, filter order, only-allowed-action);
 Karma specs for the JWT helper, `AuthService`, guard, interceptor, login redirect, the shared form (moved from
 `profile.component.spec`), the new page and the locked shell.
+
+**Generic RowAudit writer** (branch `feature-row-audit`, 2026-09-08) — `IRowAuditWriter` gained reflection-based
+`LogInsertAsync` / `LogUpdateAsync` / `LogDeleteAsync` (pkid or `[AuditKey]` → `PrimaryKeyValues`, first string
+property or changed-property list → `ActionDesc`, no row for a no-change update, `ActionDesc` cut at 1000).
+`UserName` now comes from the `userName` claim (was `Identity.Name` = `userId`) and `DateTime` from `TimeProvider`
+instead of `GETUTCDATE()`. **Wired into all eight CRUD repositories** (AppRole, AppUser, Certification, Course,
+CourseGroup, FeaturedPromoItem, Partner, PublishStatus): load → change → reload → `Log*` on the change's own
+transaction. Visible differences from before: INSERT/DELETE descriptions are the first string column (Course:
+`Title`, was `CourseId`; Certification: `Title` or NULL, was `(無名稱)`; FeaturedPromoItem: `Topic`, was
+`date TC slot text`); a save that changes nothing writes **no** row (was `(no changes)`); AppRole / AppUser keep
+`RoleId` / `UserId` as `PrimaryKeyValues` through `[AuditKey]`, and JOINed labels / counts are `[AuditIgnore]`d.
+Custom `WriteAsync` descriptions remain for password reset, profile / password change and the slot swap. The same
+branch fixed a latent crash: Dapper 2.1.79 cannot bind or read `DateOnly` at all (`Infrastructure\DapperTypeHandlers`).
+Tests: `RowAuditWriterTests` (20), `AuditHelperTests` (+2), `Repositories\PartnerRepositoryTests` (13) and
+`CourseRepositoryTests` (4) on `RecordingDbConnection` + `ListDataReader`.
+
+**異動紀錄 History badge** (branch `feature-row-audit`, 2026-09-08) — `GET /api/row-audits?tableName=&pkid=`
+(`RowAuditsController.GetForRecord`, replaces the old `/api/row-audits/{table}/{pk}?take=`) returns the record's
+**full** trail newest first as `{ dateTime, userName, actionType, actionDesc }`; a missing filter → 400
+`ValidationProblem`. `core/components/row-audit-badge` (`<app-row-audit-badge tableName [pkid]>`) is now a
+`p-button` labelled 異動紀錄 History that shows the newest entry inline (`Update by alice · 2026-06-04 14:30`,
+`尚無異動紀錄 No history`, `無法載入 Unavailable`) and opens a `p-dialog` + `p-table` with the whole trail
+(`尚無異動紀錄 No history yet` when empty); it is on all 14 detail / edit toolbars. The input was renamed `pk` →
+`pkid`; the service method `getForRow(table, pk, take)` → `getForRecord(table, pkid)`. Tests:
+`RowAuditsControllerTests` (8), `RowAuditRepositoryTests` (6), `RowAuditsEndpointTests` (11, in-memory host) and
+`row-audit-badge.component.spec.ts` (12: inline latest, empty state, dialog trail, dash for null desc, failure
+state, string keys, no pkid, record change).
 
 ## Lookup endpoints (`/api/lookups/*`)
 
