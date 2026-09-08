@@ -72,6 +72,23 @@ public class JwtTokenIssuerTests
     }
 
     [Fact]
+    public void Issue_AddsTheMustChangePasswordClaim_OnlyWhenAsked()
+    {
+        var plain = new JwtSecurityTokenHandler().ReadJwtToken(_issuer.Issue(User(), ["Admin"], SigningKey));
+        var flagged = new JwtSecurityTokenHandler().ReadJwtToken(_issuer.Issue(User(), ["Admin"], SigningKey, mustChangePassword: true));
+
+        Assert.DoesNotContain(plain.Claims, c => c.Type == JwtTokenIssuer.MustChangePasswordClaim);
+
+        var claim = Assert.Single(flagged.Claims, c => c.Type == JwtTokenIssuer.MustChangePasswordClaim);
+        Assert.Equal(JwtTokenIssuer.MustChangePasswordClaimValue, claim.Value, ignoreCase: true);
+        // Everything else is unchanged: same subject, same roles.
+        Assert.Equal(plain.Subject, flagged.Subject);
+        Assert.Equal(
+            plain.Claims.Where(c => c.Type is "role" or ClaimTypes.Role).Select(c => c.Value),
+            flagged.Claims.Where(c => c.Type is "role" or ClaimTypes.Role).Select(c => c.Value));
+    }
+
+    [Fact]
     public void Issue_SetsNotBeforeToNow_AndExpiryTo24HoursLater()
     {
         var token = _issuer.Issue(User(), [], SigningKey);

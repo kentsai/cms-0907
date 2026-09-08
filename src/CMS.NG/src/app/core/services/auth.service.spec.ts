@@ -4,7 +4,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { Router, provideRouter } from '@angular/router';
 import { environment } from '@environments/environment';
 import { UserProfile } from '@core/models/auth.model';
-import { fakeProfile, seedSignedInUser } from '@app/testing/auth-testing';
+import { fakeLoginResponse, fakeProfile, seedSignedInUser } from '@app/testing/auth-testing';
 import { AUTH_PROFILE_KEY, AuthService, LOGIN_PATH } from './auth.service';
 
 describe('AuthService', () => {
@@ -75,6 +75,38 @@ describe('AuthService', () => {
     expect(localStorage.length).toBe(0);
     expect(service.isAuthenticated()).toBeTrue();
     expect(service.userName()).toBe(profile.userName);
+  });
+
+  it('login stores only { userId, userName, accessToken } — the mustChangePassword flag stays in the token', () => {
+    const service = createService();
+    const response = fakeLoginResponse(['Editor'], true);
+
+    service.login({ userId: 'mei', password: 'Cms@Default2026' }).subscribe();
+    http.expectOne(loginUrl).flush(response);
+
+    const stored = JSON.parse(sessionStorage.getItem(AUTH_PROFILE_KEY)!) as Record<string, unknown>;
+    expect(Object.keys(stored).sort()).toEqual(['accessToken', 'userId', 'userName']);
+    expect(stored['accessToken']).toBe(response.accessToken);
+    expect(service.mustChangePassword()).toBeTrue();
+  });
+
+  it('mustChangePassword follows the claim in the stored token', () => {
+    seedSignedInUser(['Editor'], '王大明', true);
+
+    const service = createService();
+
+    expect(service.mustChangePassword()).toBeTrue();
+    expect(service.isAuthenticated()).toBeTrue();
+    expect(service.roles()).toEqual(['Editor']);
+  });
+
+  it('mustChangePassword is false for an ordinary session and when signed out', () => {
+    seedSignedInUser(['Admin']);
+    const service = createService();
+    expect(service.mustChangePassword()).toBeFalse();
+
+    service.clear();
+    expect(service.mustChangePassword()).toBeFalse();
   });
 
   it('reads the roles from the stored token', () => {

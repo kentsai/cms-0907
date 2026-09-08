@@ -1,32 +1,44 @@
 <div
   class="app-shell"
   [class.app-shell--collapsed]="sidebarCollapsed()"
-  [class.app-shell--anonymous]="!auth.isAuthenticated()">
+  [class.app-shell--anonymous]="!auth.isAuthenticated()"
+  [class.app-shell--locked]="auth.mustChangePassword()">
   @if (auth.isAuthenticated()) {
     <header class="app-topbar">
-      <button
-        type="button"
-        class="app-topbar__toggle"
-        pButton
-        text
-        rounded
-        icon="pi pi-bars"
-        [attr.aria-label]="sidebarCollapsed() ? '展開選單' : '收合選單'"
-        (click)="toggleSidebar()"></button>
+      @if (!auth.mustChangePassword()) {
+        <button
+          type="button"
+          class="app-topbar__toggle"
+          pButton
+          text
+          rounded
+          icon="pi pi-bars"
+          [attr.aria-label]="sidebarCollapsed() ? '展開選單' : '收合選單'"
+          (click)="toggleSidebar()"></button>
+      }
       <span class="app-topbar__title">{{ title() }}</span>
 
       <span class="app-topbar__spacer"></span>
 
-      <!-- User menu: the name links to 個人資料 My Profile; 登出 sits next to it. -->
-      <a
-        class="app-topbar__user"
-        routerLink="/profile"
-        routerLinkActive="app-topbar__user--active"
-        title="個人資料 My Profile">
-        <i class="pi pi-user"></i>
-        <span class="app-topbar__user-name">{{ auth.userName() }}</span>
-        <span class="app-topbar__user-hint">個人資料</span>
-      </a>
+      @if (auth.mustChangePassword()) {
+        <!-- Locked until the default password is changed: no menu, no profile link — just the name and 登出. -->
+        <span class="app-topbar__user app-topbar__user--locked" title="請先變更密碼">
+          <i class="pi pi-user"></i>
+          <span class="app-topbar__user-name">{{ auth.userName() }}</span>
+          <span class="app-topbar__user-hint">請先變更密碼</span>
+        </span>
+      } @else {
+        <!-- User menu: the name links to 個人資料 My Profile; 登出 sits next to it. -->
+        <a
+          class="app-topbar__user"
+          routerLink="/profile"
+          routerLinkActive="app-topbar__user--active"
+          title="個人資料 My Profile">
+          <i class="pi pi-user"></i>
+          <span class="app-topbar__user-name">{{ auth.userName() }}</span>
+          <span class="app-topbar__user-hint">個人資料</span>
+        </a>
+      }
       <button
         type="button"
         class="app-topbar__logout"
@@ -37,9 +49,11 @@
         (click)="logout()"></button>
     </header>
 
-    <aside class="app-sidebar">
-      <p-panelmenu [model]="menuItems()" styleClass="app-sidebar__menu" />
-    </aside>
+    @if (!auth.mustChangePassword()) {
+      <aside class="app-sidebar">
+        <p-panelmenu [model]="menuItems()" styleClass="app-sidebar__menu" />
+      </aside>
+    }
   }
 
   <main class="app-content">

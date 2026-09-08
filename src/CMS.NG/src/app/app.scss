@@ -18,6 +18,22 @@
   }
 }
 
+// Signed in with the default password: topbar only (name + 登出), no sidebar until the password is changed.
+.app-shell--locked {
+  grid-template-columns: 1fr;
+  grid-template-areas:
+    'topbar'
+    'content';
+
+  .app-topbar__user--locked {
+    cursor: default;
+
+    &:hover {
+      background: transparent;
+    }
+  }
+}
+
 // Signed out (login page): no topbar / sidebar, the outlet takes the whole viewport.
 .app-shell--anonymous {
   grid-template-columns: 1fr;

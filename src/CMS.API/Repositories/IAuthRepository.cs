@@ -18,6 +18,13 @@ public interface IAuthRepository
     Task<string> GetSymmetricSecurityKeyAsync(CancellationToken cancellationToken);
 
     /// <summary>
+    /// <c>SysConfig.appConfig.defaultPassword</c> (the password admins seed new / reset accounts with), read at call
+    /// time. Login compares the presented password with it to flag a session that must change its password.
+    /// Throws <see cref="Infrastructure.AppConfigException"/> when it cannot be resolved.
+    /// </summary>
+    Task<string> GetDefaultPasswordAsync(CancellationToken cancellationToken);
+
+    /// <summary>
     /// Sets <c>AppUser.UserName</c> for <paramref name="userId"/> (already trimmed and non-empty) and writes the RowAudit.
     /// Returns false when no row matched. Nothing else on the row is touched.
     /// </summary>

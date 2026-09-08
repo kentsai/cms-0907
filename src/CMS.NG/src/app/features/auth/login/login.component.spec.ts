@@ -5,8 +5,8 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angular/router';
 import { ConfirmationService, MessageService } from 'primeng/api';
 import { environment } from '@environments/environment';
-import { AUTH_PROFILE_KEY } from '@core/services/auth.service';
-import { fakeProfile } from '@app/testing/auth-testing';
+import { AUTH_PROFILE_KEY, CHANGE_PASSWORD_PATH } from '@core/services/auth.service';
+import { fakeLoginResponse, fakeProfile } from '@app/testing/auth-testing';
 import { LoginComponent } from './login.component';
 
 describe('LoginComponent', () => {
@@ -135,6 +135,26 @@ describe('LoginComponent', () => {
     backend.expectOne(loginUrl).flush(fakeProfile());
 
     expect(navigate).toHaveBeenCalledWith('/');
+  });
+
+  it('sends a default-password login to the change-password page, ignoring returnUrl', async () => {
+    await mount({ returnUrl: '/course/courses' });
+
+    fillAndSubmit('mei', 'Cms@Default2026');
+    backend.expectOne(loginUrl).flush(fakeLoginResponse(['Editor'], true));
+
+    expect(navigate).toHaveBeenCalledWith(CHANGE_PASSWORD_PATH);
+    const stored = JSON.parse(sessionStorage.getItem(AUTH_PROFILE_KEY)!) as Record<string, unknown>;
+    expect(Object.keys(stored).sort()).toEqual(['accessToken', 'userId', 'userName']);
+  });
+
+  it('honours returnUrl for a login whose response says mustChangePassword: false', async () => {
+    await mount({ returnUrl: '/course/courses' });
+
+    fillAndSubmit();
+    backend.expectOne(loginUrl).flush(fakeLoginResponse(['Editor'], false));
+
+    expect(navigate).toHaveBeenCalledWith('/course/courses');
   });
 
   it('does not call the API while the form is empty', async () => {

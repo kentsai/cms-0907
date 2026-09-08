@@ -5,7 +5,7 @@ import { ButtonModule } from 'primeng/button';
 import { CardModule } from 'primeng/card';
 import { InputTextModule } from 'primeng/inputtext';
 import { MessageModule } from 'primeng/message';
-import { AuthService, PASSWORD_CHANGED_REASON } from '@core/services/auth.service';
+import { AuthService, CHANGE_PASSWORD_PATH, PASSWORD_CHANGED_REASON } from '@core/services/auth.service';
 
 export const PASSWORD_CHANGED_NOTICE = '密碼已變更，請使用新密碼重新登入。（Your password was changed. Please sign in again with the new password.）';
 
@@ -54,7 +54,8 @@ export class LoginComponent {
     this.auth.login({ userId: userId.trim(), password }).subscribe({
       next: () => {
         this.loading.set(false);
-        this.router.navigateByUrl(this.safeReturnUrl());
+        // A default-password login may only change its password: go straight there, whatever returnUrl says.
+        this.router.navigateByUrl(this.auth.mustChangePassword() ? CHANGE_PASSWORD_PATH : this.safeReturnUrl());
       },
       error: (err: { status?: number; error?: { message?: string } }) => {
         this.loading.set(false);

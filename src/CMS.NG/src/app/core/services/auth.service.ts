@@ -6,17 +6,20 @@ import { environment } from '@environments/environment';
 import {
   ChangePasswordRequest,
   LoginRequest,
+  LoginResponse,
   ProfileResponse,
   UpdateProfileRequest,
   UserProfile
 } from '@core/models/auth.model';
-import { rolesFromToken } from '@core/utils/jwt.util';
+import { mustChangePasswordFromToken, rolesFromToken } from '@core/utils/jwt.util';
 import { readSession, writeSession } from '@core/utils/session-storage.util';
 
 /** sessionStorage key holding the `UserProfile` of the signed-in user. */
 export const AUTH_PROFILE_KEY = 'auth-profile';
 /** The public login route; the guard and the 401 handler both send the user here. */
 export const LOGIN_PATH = '/login';
+/** The only page a user who signed in with the default password may use until the password is changed. */
+export const CHANGE_PASSWORD_PATH = '/change-password';
 /** `?reason=` value the profile page sends to `/login` after a password change, so the page can say why. */
 export const PASSWORD_CHANGED_REASON = 'password-changed';
 /** Role that unlocks the `系統管理 Admin` menu group. */
@@ -43,10 +46,18 @@ export class AuthService {
   /** Roles carried as claims in the stored token — no extra API call. */
   readonly roles = computed(() => rolesFromToken(this.profileState()?.accessToken));
   readonly isAdmin = computed(() => this.roles().includes(ADMIN_ROLE));
+  /**
+   * True while the stored token was issued to a login with the system default password: the API refuses
+   * everything but the password change (403), so the guard keeps the user on `CHANGE_PASSWORD_PATH`.
+   * Changing the password ends the session; the next login (with the new password) is unrestricted.
+   */
+  readonly mustChangePassword = computed(() => mustChangePasswordFromToken(this.profileState()?.accessToken));
 
-  /** Posts the credentials and, on success, stores the returned profile in session storage. */
-  login(request: LoginRequest): Observable<UserProfile> {
-    return this.http.post<UserProfile>(this.loginUrl, request).pipe(tap(profile => this.storeProfile(profile)));
+  /** Posts the credentials and, on success, stores the returned profile (not the flag — it lives in the token) in session storage. */
+  login(request: LoginRequest): Observable<LoginResponse> {
+    return this.http.post<LoginResponse>(this.loginUrl, request).pipe(
+      tap(({ userId, userName, accessToken }) => this.storeProfile({ userId, userName, accessToken }))
+    );
   }
 
   /**

@@ -378,4 +378,144 @@ public class JwtBearerAuthorizationTests
 
         Assert.Equal(HttpStatusCode.OK, (await ClientWithToken(factory, profile.AccessToken).GetAsync(ProtectedUrl)).StatusCode);
     }
+
+    // ---- login with the default password: only the password change is reachable ----
+
+    private static async Task AssertPasswordChangeRequired(HttpResponseMessage response)
+    {
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<Dictionary<string, string>>();
+        Assert.Equal(PasswordChangeRequiredFilter.PasswordChangeRequiredMessage, body?["message"]);
+    }
+
+    [Fact]
+    public async Task Login_WithTheDefaultPassword_IsFlagged_AndItsTokenIs403Everywhere_ExceptChangePassword()
+    {
+        using var factory = new CmsApiFactory();
+        factory.AuthRepository
+            .Setup(r => r.GetCredentialAsync(CmsApiFactory.UserId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(CmsApiFactory.Credential(CmsApiFactory.DefaultPassword)); // freshly created / reset account
+
+        var login = await factory.CreateClient().PostAsJsonAsync(LoginUrl, new LoginRequest { UserId = CmsApiFactory.UserId, Password = CmsApiFactory.DefaultPassword });
+        Assert.Equal(HttpStatusCode.OK, login.StatusCode);
+        var profile = await login.Content.ReadFromJsonAsync<LoginResponse>();
+        Assert.NotNull(profile);
+        Assert.True(profile.MustChangePassword);
+
+        var session = ClientWithToken(factory, profile.AccessToken);
+
+        await AssertPasswordChangeRequired(await session.GetAsync(ProtectedUrl));
+        await AssertPasswordChangeRequired(await session.PutAsJsonAsync(ProfileUrl, new { userName = "New Name" }));
+        factory.PublishStatusRepository.Verify(r => r.GetAllAsync(It.IsAny<CancellationToken>()), Times.Never);
+        factory.AuthRepository.Verify(r => r.UpdateUserNameAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+
+        // The password change is reachable: a wrong current password proves the request got to the action (400, not 403).
+        var attempt = await session.PostAsJsonAsync(ChangePasswordUrl, new ChangePasswordRequest
+        {
+            CurrentPassword = "not-the-default", NewPassword = "Summer2026!", ConfirmNewPassword = "Summer2026!"
+        });
+        Assert.Equal(HttpStatusCode.BadRequest, attempt.StatusCode);
+    }
+
+    [Fact]
+    public async Task DefaultPasswordSession_AfterChangingThePassword_TheNewLoginIsUnrestricted()
+    {
+        using var factory = new CmsApiFactory();
+
+        var credential = CmsApiFactory.Credential(CmsApiFactory.DefaultPassword);
+        var stamp = new PasswordStamp { PasswordUpdatedTime = null };
+        factory.AuthRepository
+            .Setup(r => r.GetCredentialAsync(CmsApiFactory.UserId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() => credential);
+        factory.AuthRepository
+            .Setup(r => r.GetPasswordStampAsync(CmsApiFactory.UserId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() => stamp);
+        factory.AuthRepository
+            .Setup(r => r.UpdatePasswordAsync(CmsApiFactory.UserId, It.IsAny<string>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .Callback((string _, string hash, DateTime updatedAt, CancellationToken _) =>
+            {
+                credential = new AppUserCredential { UserId = credential.UserId, UserName = credential.UserName, IsActive = true, PasswordHash = hash };
+                stamp = new PasswordStamp { PasswordUpdatedTime = updatedAt };
+            })
+            .ReturnsAsync(true);
+
+        var anonymous = factory.CreateClient();
+        var firstLogin = await anonymous.PostAsJsonAsync(LoginUrl, new LoginRequest { UserId = CmsApiFactory.UserId, Password = CmsApiFactory.DefaultPassword });
+        var flagged = await firstLogin.Content.ReadFromJsonAsync<LoginResponse>();
+        Assert.NotNull(flagged);
+        Assert.True(flagged.MustChangePassword);
+        var flaggedSession = ClientWithToken(factory, flagged.AccessToken);
+        await AssertPasswordChangeRequired(await flaggedSession.GetAsync(ProtectedUrl));
+
+        // Wait past the whole-second resolution of the revocation stamp so the flagged token's iat is strictly earlier.
+        await Task.Delay(TimeSpan.FromSeconds(1.1));
+
+        const string newPassword = "Summer2026!";
+        var change = await flaggedSession.PostAsJsonAsync(ChangePasswordUrl, new ChangePasswordRequest
+        {
+            CurrentPassword = CmsApiFactory.DefaultPassword, NewPassword = newPassword, ConfirmNewPassword = newPassword
+        });
+        Assert.Equal(HttpStatusCode.NoContent, change.StatusCode);
+
+        // The flagged token is dead (revoked by the password change), not merely still 403.
+        Assert.Equal(HttpStatusCode.Unauthorized, (await flaggedSession.GetAsync(ProtectedUrl)).StatusCode);
+
+        // The default password no longer logs in; the new one does, without the flag, and opens everything.
+        Assert.Equal(HttpStatusCode.Unauthorized,
+            (await anonymous.PostAsJsonAsync(LoginUrl, new LoginRequest { UserId = CmsApiFactory.UserId, Password = CmsApiFactory.DefaultPassword })).StatusCode);
+
+        var freshLogin = await anonymous.PostAsJsonAsync(LoginUrl, new LoginRequest { UserId = CmsApiFactory.UserId, Password = newPassword });
+        Assert.Equal(HttpStatusCode.OK, freshLogin.StatusCode);
+        var fresh = await freshLogin.Content.ReadFromJsonAsync<LoginResponse>();
+        Assert.NotNull(fresh);
+        Assert.False(fresh.MustChangePassword);
+        Assert.Equal(HttpStatusCode.OK, (await ClientWithToken(factory, fresh.AccessToken).GetAsync(ProtectedUrl)).StatusCode);
+    }
+
+    [Fact]
+    public async Task FlaggedToken_ThatIsOtherwiseInvalid_Gets401NotForbidden()
+    {
+        using var factory = new CmsApiFactory();
+        var expired = new JwtTokenIssuer(new FixedTimeProvider(DateTimeOffset.UtcNow.AddDays(-2)))
+            .Issue(CmsApiFactory.Credential(), [], CmsApiFactory.SigningKey, mustChangePassword: true);
+
+        var response = await ClientWithToken(factory, expired).GetAsync(ProtectedUrl);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task FlaggedToken_IssuedDirectly_IsAlsoBlocked()
+    {
+        using var factory = new CmsApiFactory();
+        var client = ClientWithToken(factory, CmsApiFactory.IssueMustChangePasswordToken("Admin"));
+
+        await AssertPasswordChangeRequired(await client.GetAsync(ProtectedUrl));
+    }
+
+    [Fact]
+    public void PasswordChangeRequiredFilter_IsRegisteredGlobally_AfterTheAuthorizeFilter()
+    {
+        using var factory = new CmsApiFactory();
+        var filters = factory.Services.GetRequiredService<IOptions<MvcOptions>>().Value.Filters;
+
+        var authorizeIndex = filters.ToList().FindIndex(f => f is AuthorizeFilter);
+        var requiredIndex = filters.ToList().FindIndex(f => f is PasswordChangeRequiredFilter);
+
+        Assert.True(authorizeIndex >= 0);
+        Assert.True(requiredIndex > authorizeIndex, "the 401 for a missing / invalid token must win over the 403");
+    }
+
+    [Fact]
+    public void ChangePassword_IsTheOnlyActionInTheApi_ThatAllowsAPasswordChangeRequiredSession()
+    {
+        var allowed = typeof(Program).Assembly.GetTypes()
+            .Where(t => !t.IsAbstract && typeof(ControllerBase).IsAssignableFrom(t))
+            .SelectMany(t => t.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly))
+            .Where(m => m.GetCustomAttribute<AllowPasswordChangeRequiredAttribute>() is not null)
+            .Select(m => $"{m.DeclaringType!.Name}.{m.Name}")
+            .ToList();
+
+        Assert.Equal([$"{nameof(AuthController)}.{nameof(AuthController.ChangePassword)}"], allowed);
+    }
 }

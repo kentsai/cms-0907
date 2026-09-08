@@ -14,6 +14,8 @@ builder.Services.AddControllers(options =>
     // Every action requires an authenticated user; only AuthController opts out with [AllowAnonymous].
     var authenticatedUser = new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build();
     options.Filters.Add(new AuthorizeFilter(authenticatedUser));
+    // A login made with the default password gets a token that only opens the password change (403 elsewhere).
+    options.Filters.Add(new PasswordChangeRequiredFilter());
 });
 
 builder.Services.AddEndpointsApiExplorer();

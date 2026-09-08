@@ -1,5 +1,5 @@
 import { fakeJwt } from '@app/testing/auth-testing';
-import { decodeJwtPayload, rolesFromToken } from './jwt.util';
+import { decodeJwtPayload, mustChangePasswordFromToken, rolesFromToken } from './jwt.util';
 
 describe('jwt.util', () => {
   describe('decodeJwtPayload', () => {
@@ -16,6 +16,23 @@ describe('jwt.util', () => {
       expect(decodeJwtPayload('a.b')).toBeNull();
       expect(decodeJwtPayload('a.!!!.c')).toBeNull();
       expect(decodeJwtPayload(`h.${btoa('[1,2]')}.s`)).toBeNull();
+    });
+  });
+
+  describe('mustChangePasswordFromToken', () => {
+    it('is true for a boolean or string "true" claim', () => {
+      expect(mustChangePasswordFromToken(fakeJwt({ sub: 'mei', mustChangePassword: true }))).toBeTrue();
+      expect(mustChangePasswordFromToken(fakeJwt({ sub: 'mei', mustChangePassword: 'true' }))).toBeTrue();
+      expect(mustChangePasswordFromToken(fakeJwt({ sub: 'mei', mustChangePassword: 'True' }))).toBeTrue();
+    });
+
+    it('is false when the claim is absent, false, another value, or the token unreadable', () => {
+      expect(mustChangePasswordFromToken(fakeJwt({ sub: 'mei' }))).toBeFalse();
+      expect(mustChangePasswordFromToken(fakeJwt({ sub: 'mei', mustChangePassword: false }))).toBeFalse();
+      expect(mustChangePasswordFromToken(fakeJwt({ sub: 'mei', mustChangePassword: 'false' }))).toBeFalse();
+      expect(mustChangePasswordFromToken(fakeJwt({ sub: 'mei', mustChangePassword: 1 }))).toBeFalse();
+      expect(mustChangePasswordFromToken(undefined)).toBeFalse();
+      expect(mustChangePasswordFromToken('garbage')).toBeFalse();
     });
   });
 

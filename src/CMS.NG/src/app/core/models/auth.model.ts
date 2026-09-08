@@ -15,6 +15,15 @@ export interface UserProfile {
   accessToken: string;
 }
 
+/**
+ * Response of `POST /api/auth/login`: the profile plus a flag that is true when the login used the system
+ * default password. The flag is also a claim inside the token (`mustChangePasswordFromToken`), which is what
+ * the app reads after the profile has been stored.
+ */
+export interface LoginResponse extends UserProfile {
+  mustChangePassword: boolean;
+}
+
 /** Body of `PUT /api/auth/profile` — only the UserName; the user is the token subject. */
 export interface UpdateProfileRequest {
   userName: string;

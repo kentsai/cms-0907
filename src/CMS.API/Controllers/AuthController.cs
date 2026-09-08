@@ -15,6 +15,9 @@ namespace CMS.API.Controllers;
 /// tell which check failed. <c>PasswordHash</c> never leaves this controller.
 /// <see cref="Login"/> is the only anonymous action in the API (authorization is applied globally in
 /// <c>Program.cs</c>); <see cref="UpdateProfile"/> and <see cref="ChangePassword"/> require a token like everything else.
+/// A login made with the system default password (<c>SysConfig.appConfig.defaultPassword</c>) is accepted but its
+/// token carries <see cref="JwtTokenIssuer.MustChangePasswordClaim"/>: <see cref="ChangePassword"/> is then the only
+/// action it can reach (<see cref="PasswordChangeRequiredFilter"/>), and the change ends that session.
 /// </summary>
 [ApiController]
 [Route("api/auth")]
@@ -51,12 +54,17 @@ public class AuthController(
         {
             var roleIds = await repository.GetRoleIdsAsync(user.UserId, cancellationToken);
             var signingKey = await repository.GetSymmetricSecurityKeyAsync(cancellationToken);
+            // The hash already matched, so comparing the plain text with the configured default is exact: a user
+            // still on the admin-seeded / reset password gets a token that only opens ChangePassword.
+            var defaultPassword = await repository.GetDefaultPasswordAsync(cancellationToken);
+            var mustChangePassword = string.Equals(request.Password, defaultPassword, StringComparison.Ordinal);
 
             return Ok(new LoginResponse
             {
                 UserId = user.UserId,
                 UserName = user.UserName,
-                AccessToken = tokenIssuer.Issue(user, roleIds, signingKey)
+                AccessToken = tokenIssuer.Issue(user, roleIds, signingKey, mustChangePassword),
+                MustChangePassword = mustChangePassword
             });
         }
         catch (AppConfigException ex)
@@ -111,7 +119,9 @@ public class AuthController(
     /// field. On success <c>PasswordHash</c> = SHA-256(new) and <c>PasswordUpdatedTime</c> = now; no hash is ever
     /// returned. The new <c>PasswordUpdatedTime</c> also invalidates every token issued before it — including the
     /// one this request was made with — so the caller must log in again with the new password.
+    /// This is the only action a default-password session may call (<see cref="AllowPasswordChangeRequiredAttribute"/>).
     /// </summary>
+    [AllowPasswordChangeRequired]
     [HttpPost("change-password")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]

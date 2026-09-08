@@ -44,40 +44,7 @@
   </p-card>
 </form>
 
-<form id="passwordForm" [formGroup]="passwordForm" (ngSubmit)="changePassword()" novalidate>
-  <p-card header="變更密碼 Change Password" styleClass="form-card">
-    <div class="form-grid">
-      <div class="field">
-        <label for="currentPassword">目前密碼 Current password <span class="required">*</span></label>
-        <input id="currentPassword" pInputText type="password" formControlName="currentPassword" autocomplete="current-password" />
-        @if (passwordError('currentPassword'); as error) {
-          <small class="error" data-testid="currentPassword-error">{{ error }}</small>
-        }
-      </div>
-
-      <div class="field">
-        <label for="newPassword">新密碼 New password <span class="required">*</span></label>
-        <input id="newPassword" pInputText type="password" formControlName="newPassword" autocomplete="new-password" />
-        @if (passwordError('newPassword'); as error) {
-          <small class="error" data-testid="newPassword-error">{{ error }}</small>
-        } @else {
-          <small class="hint">{{ policyMessage }}</small>
-        }
-      </div>
-
-      <div class="field">
-        <label for="confirmNewPassword">確認新密碼 Confirm new password <span class="required">*</span></label>
-        <input id="confirmNewPassword" pInputText type="password" formControlName="confirmNewPassword" autocomplete="new-password" />
-        @if (passwordError('confirmNewPassword'); as error) {
-          <small class="error" data-testid="confirmNewPassword-error">{{ error }}</small>
-        }
-      </div>
-    </div>
-
-    <ng-template #footer>
-      <div class="card-actions">
-        <p-button label="變更密碼" icon="pi pi-key" type="submit" [loading]="changingPassword()" [disabled]="passwordForm.invalid || changingPassword()" />
-      </div>
-    </ng-template>
-  </p-card>
-</form>
+<!-- Shared with the standalone /change-password page; a success ends the session and returns to /login. -->
+<p-card header="變更密碼 Change Password" styleClass="form-card">
+  <app-change-password-form />
+</p-card>

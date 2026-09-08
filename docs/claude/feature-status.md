@@ -3,17 +3,17 @@
 Read this when choosing the next table to scaffold or when touching an existing feature's
 non-obvious behaviour. Specs live in `spec\{sub-system}\{Table}.md`; build with `/crud`.
 
-Totals as of 2026-09-08: **348 xUnit + 372 Karma** tests passing; `ng build` succeeds
+Totals as of 2026-09-08: **369 xUnit + 393 Karma** tests passing; `ng build` succeeds
 (the initial bundle exceeds the 500 kB budget *warning* because of PrimeNG shared chunks —
-not an error). Everything through Login, JWT authorization, My Profile and Change Password
-(with token revocation) is committed on `develop`.
+not an error). Everything through Login, JWT authorization, My Profile, Change Password
+(with token revocation) and the forced change for default-password logins is on `develop`.
 
 ## Built
 
 Summary: PublishStatus, AppRole, AppUser, Partner, CourseGroup, Course (detail QR code,
 list in-place editing), Certification, the custom FeaturedPromoItem weekly board
-(`首頁 Home` menu), and Login + JWT authorization + My Profile + Change Password end-to-end
-(spec `spec\auth\Auth.md`). Details per feature follow.
+(`首頁 Home` menu), and Login + JWT authorization + My Profile + Change Password (+ forced
+change after a default-password login) end-to-end (spec `spec\auth\Auth.md`). Details per feature follow.
 
 **PublishStatus** (`spec\admin\PublishStatus.md`) — first feature; introduced the
 RowAudit plumbing and the lookup endpoint pattern. Commit `9f2fd4c`.
@@ -139,6 +139,28 @@ request. Frontend: on 204 the profile page calls `AuthService.clear()` and navig
 change → old token 401 → old password 401 → new password logs in); Karma specs for the validator, the service
 call, the form (empty / weak / mismatch never call the API; success clears the session and redirects) and the
 login notice.
+
+**Forced password change after a default-password login** (spec `spec\auth\Auth.md`) — there is no DB flag:
+`AuthController.Login` compares the accepted password with `SysConfig.appConfig.defaultPassword`
+(`IAuthRepository.GetDefaultPasswordAsync`, ordinal) and, when equal, issues the token with claim
+`mustChangePassword = true` (`JwtTokenIssuer.MustChangePasswordClaim`) and returns `LoginResponse.MustChangePassword`.
+The global `Infrastructure\PasswordChangeRequiredFilter` (registered after the `AuthorizeFilter`, so a bad token is
+still 401) answers **403** `{ message: "請先變更密碼後再使用系統。" }` to every action except the one carrying
+`[AllowPasswordChangeRequired]` — only `AuthController.ChangePassword` (reflection test). Changing the password
+revokes the flagged token as usual; the next login (new password) is clean. Both admin paths (create, reset) are
+covered because detection happens at login; tokens issued before this feature carry no claim and are unaffected.
+Frontend: `AuthService.mustChangePassword` (claim read from the stored token by `mustChangePasswordFromToken`;
+the flag is **not** stored in session storage), `authGuard` redirects every URL except `/change-password` there,
+`LoginComponent` goes straight to `/change-password` (ignoring `returnUrl`), the interceptor treats a 403 for a
+flagged session as "go to `/change-password`" (no logout), and the shell is locked (`app-shell--locked`: no
+sidebar, no menu toggle, the topbar name is plain text with 請先變更密碼; 登出 stays). The 變更密碼 form is now
+the shared `features/auth/change-password-form` (used by `/profile` and by the new `features/auth/change-password`
+page, which shows a bilingual warning only when the session is flagged). Tests: `AuthControllerTests` (flag /
+no flag / ordinal / 500 / never read on failure), `JwtTokenIssuerTests`, `PasswordChangeRequiredFilterTests`,
+`JwtBearerAuthorizationTests` (403 on protected + profile, change-password reachable, end-to-end default login →
+change → old token 401 → new login unflagged, expired flagged token is 401, filter order, only-allowed-action);
+Karma specs for the JWT helper, `AuthService`, guard, interceptor, login redirect, the shared form (moved from
+`profile.component.spec`), the new page and the locked shell.
 
 ## Lookup endpoints (`/api/lookups/*`)
 

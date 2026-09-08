@@ -20,6 +20,8 @@ public sealed class CmsApiFactory : WebApplicationFactory<Program>
     public const string UserId = "helen";
     public const string UserName = "Helen Chen";
     public const string Password = "Welcome123!";
+    /// <summary>SysConfig.appConfig.defaultPassword — a login with it gets a token that only opens the password change.</summary>
+    public const string DefaultPassword = "Cms@Default2026";
 
     public Mock<IAuthRepository> AuthRepository { get; } = new(MockBehavior.Strict);
     public Mock<IPublishStatusRepository> PublishStatusRepository { get; } = new(MockBehavior.Strict);
@@ -29,6 +31,9 @@ public sealed class CmsApiFactory : WebApplicationFactory<Program>
         AuthRepository
             .Setup(r => r.GetSymmetricSecurityKeyAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(SigningKey);
+        AuthRepository
+            .Setup(r => r.GetDefaultPasswordAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(DefaultPassword);
         AuthRepository
             .Setup(r => r.GetCredentialAsync(UserId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(Credential());
@@ -48,17 +53,21 @@ public sealed class CmsApiFactory : WebApplicationFactory<Program>
             .ReturnsAsync([new PublishStatus { Pkid = 1, Description = "草稿", IsDraft = true }]);
     }
 
-    public static AppUserCredential Credential() => new()
+    public static AppUserCredential Credential(string password = Password) => new()
     {
         UserId = UserId,
         UserName = UserName,
         IsActive = true,
-        PasswordHash = PasswordHasher.Sha256Hex(Password)
+        PasswordHash = PasswordHasher.Sha256Hex(password)
     };
 
     /// <summary>A token exactly as <c>POST /api/auth/login</c> would issue it, optionally with a pinned clock or another key.</summary>
     public static string IssueToken(TimeProvider? clock = null, string signingKey = SigningKey, params string[] roles) =>
         new JwtTokenIssuer(clock ?? TimeProvider.System).Issue(Credential(), roles, signingKey);
+
+    /// <summary>A token as issued to a login that used the default password: carries the must-change-password claim.</summary>
+    public static string IssueMustChangePasswordToken(params string[] roles) =>
+        new JwtTokenIssuer(TimeProvider.System).Issue(Credential(), roles, SigningKey, mustChangePassword: true);
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {

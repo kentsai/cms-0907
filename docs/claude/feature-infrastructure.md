@@ -75,6 +75,14 @@ src\
   `Tests\Infrastructure\CmsApiFactory` (`WebApplicationFactory<Program>`; `IAuthRepository` and
   `IPublishStatusRepository` replaced by Moq mocks, `IssueToken(...)` mints tokens) — add more repository
   mocks there when a test needs another controller.
+- **Default-password lock** — `Login` also calls `IAuthRepository.GetDefaultPasswordAsync` (same
+  `SysConfig.appConfig` read as the signing key, `AppConfigJson.ExtractDefaultPassword`) and passes
+  `mustChangePassword` to `IJwtTokenIssuer.Issue(user, roleIds, key, mustChangePassword)`, which adds the
+  `mustChangePassword` claim. `Infrastructure\PasswordChangeRequiredFilter` (global, after the
+  `AuthorizeFilter` in `Program.cs`) turns that claim into 403 `{ message }` unless the action carries
+  `Infrastructure\AllowPasswordChangeRequiredAttribute` — only `AuthController.ChangePassword` may. Strict
+  mocks (`AuthControllerTests`, `CmsApiFactory`) need a `GetDefaultPasswordAsync` setup on every login path;
+  `CmsApiFactory.DefaultPassword` / `Credential(password)` / `IssueMustChangePasswordToken()` exist for it.
 - `Controllers\LookupsController` (`/api/lookups/*`) — one action per FK-target table.
   Tables with their own repository expose `GetLookupAsync` there; `LookupRepository`
   holds only lookups for tables with **no** feature yet (currently `job-categories`,
@@ -112,9 +120,15 @@ src\
   `app.routes.ts`) redirects to `/login?returnUrl=`. `features/auth/login` is the public page (honours
   only in-app `returnUrl`s). `updateProfile(userName)` PUTs `/auth/profile` and patches the stored
   profile's `userName` (token unchanged), which is what `features/auth/profile` (`/profile`, 個人資料
-  My Profile: read-only UserId + role tags, editable UserName) and the topbar rely on. Tests:
-  `src/app/testing/auth-testing.ts` (`fakeJwt`, `fakeProfile`, `seedSignedInUser(roles)`) — seed
-  **before** the TestBed creates `AuthService`.
+  My Profile: read-only UserId + role tags, editable UserName) and the topbar rely on.
+  `mustChangePassword` (claim decoded from the token, never stored) drives `authGuard` (everything but
+  `CHANGE_PASSWORD_PATH` = `/change-password` redirects there), the interceptor's 403 handling, the login
+  redirect and the locked shell (`app-shell--locked`). The 變更密碼 form is the shared
+  `features/auth/change-password-form` (`<app-change-password-form>`, ids `#passwordForm #currentPassword`
+  etc.), hosted by `/profile` and by `features/auth/change-password` (`/change-password`). Tests:
+  `src/app/testing/auth-testing.ts` (`fakeJwt`, `fakeProfile(roles, userName, userId, mustChangePassword)`,
+  `fakeLoginResponse(roles, mustChangePassword)`, `seedSignedInUser(roles, userName, mustChangePassword)`) —
+  seed **before** the TestBed creates `AuthService`.
 - `core/utils/date.util.ts` — `toIso` / `fromIso` / `addYears` / `addDays` / `startOfWeek`
   (Monday) / `formatMonthDayWeekday` (`3/16 (一)`) for `date` columns (local components only,
   never `toISOString`).

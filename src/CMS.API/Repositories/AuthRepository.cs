@@ -112,13 +112,18 @@ public sealed class AuthRepository(IDbConnectionFactory connectionFactory, IRowA
         return ids.AsList();
     }
 
-    public async Task<string> GetSymmetricSecurityKeyAsync(CancellationToken cancellationToken)
+    public async Task<string> GetSymmetricSecurityKeyAsync(CancellationToken cancellationToken) =>
+        AppConfigJson.ExtractSymmetricSecurityKey(await GetAppConfigValueAsync(cancellationToken));
+
+    public async Task<string> GetDefaultPasswordAsync(CancellationToken cancellationToken) =>
+        AppConfigJson.ExtractDefaultPassword(await GetAppConfigValueAsync(cancellationToken));
+
+    /// <summary>The raw <c>SysConfig.appConfig</c> JSON, or null when the row is missing.</summary>
+    private async Task<string?> GetAppConfigValueAsync(CancellationToken cancellationToken)
     {
         await using var connection = await connectionFactory.CreateOpenConnectionAsync(cancellationToken);
-        var configValue = await connection.ExecuteScalarAsync<string?>(new CommandDefinition(
+        return await connection.ExecuteScalarAsync<string?>(new CommandDefinition(
             "SELECT configValue FROM SysConfig WHERE configKey = @ConfigKey",
             new { ConfigKey = AppConfigJson.ConfigKey }, cancellationToken: cancellationToken));
-
-        return AppConfigJson.ExtractSymmetricSecurityKey(configValue);
     }
 }

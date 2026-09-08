@@ -73,6 +73,9 @@ Optional (nullable):
 5. A missing `appConfig` row, invalid JSON, or a missing/empty `defaultPassword` raises
    `AppConfigException`; the controller turns it into **500** with a Chinese message
    (系統設定錯誤). Create is rolled back in that case.
+6. **Consequence for the user** (`Auth.md`, *Default-password lock*): the next login with the default
+   password succeeds but is confined to changing the password (API 403 elsewhere, SPA `/change-password`)
+   until a password of their own is set. Nothing here needs to flag the row — login detects it.
 
 Helpers: `Infrastructure\PasswordHasher.Sha256Hex(string)` and
 `Infrastructure\AppConfigJson.ExtractDefaultPassword(string? json)` are pure and unit-tested.

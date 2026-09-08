@@ -239,6 +239,12 @@ export const routes: Routes = [
         path: 'profile',
         loadComponent: () => import('@features/auth/profile/profile.component').then(m => m.ProfileComponent)
       },
+      {
+        // 變更密碼 — the only page a default-password login may use (authGuard sends it here from every other URL).
+        path: 'change-password',
+        loadComponent: () =>
+          import('@features/auth/change-password/change-password.component').then(m => m.ChangePasswordComponent)
+      },
       ...featureRoutes
     ]
   }

@@ -12,8 +12,11 @@ public interface IJwtTokenIssuer
     /// Signs an HS256 access token for <paramref name="user"/> carrying the UserId, UserName and one role claim per
     /// <paramref name="roleIds"/> entry, expiring <see cref="JwtTokenIssuer.TokenLifetime"/> after issue.
     /// Throws <see cref="AppConfigException"/> when <paramref name="symmetricSecurityKey"/> is too short for HS256.
+    /// When <paramref name="mustChangePassword"/> is true the token also carries
+    /// <see cref="JwtTokenIssuer.MustChangePasswordClaim"/>, which <see cref="PasswordChangeRequiredFilter"/> turns
+    /// into a 403 for every action except the password change.
     /// </summary>
-    string Issue(AppUserCredential user, IReadOnlyList<string> roleIds, string symmetricSecurityKey);
+    string Issue(AppUserCredential user, IReadOnlyList<string> roleIds, string symmetricSecurityKey, bool mustChangePassword = false);
 }
 
 /// <summary>
@@ -31,10 +34,17 @@ public sealed class JwtTokenIssuer(TimeProvider timeProvider) : IJwtTokenIssuer
     /// <summary>Claim type holding <c>AppUser.UserName</c>.</summary>
     public const string UserNameClaim = "userName";
 
+    /// <summary>
+    /// Claim type (value <see cref="MustChangePasswordClaimValue"/>) present only on a token issued to a login that
+    /// used the default password. Absent on every other token, so old tokens need no migration.
+    /// </summary>
+    public const string MustChangePasswordClaim = "mustChangePassword";
+    public const string MustChangePasswordClaimValue = "true";
+
     /// <summary>HS256 needs at least 256 bits of key material, otherwise Microsoft.IdentityModel throws IDX10653.</summary>
     private const int MinimumKeyBytes = 32;
 
-    public string Issue(AppUserCredential user, IReadOnlyList<string> roleIds, string symmetricSecurityKey)
+    public string Issue(AppUserCredential user, IReadOnlyList<string> roleIds, string symmetricSecurityKey, bool mustChangePassword = false)
     {
         ArgumentNullException.ThrowIfNull(user);
         ArgumentNullException.ThrowIfNull(roleIds);
@@ -59,6 +69,10 @@ public sealed class JwtTokenIssuer(TimeProvider timeProvider) : IJwtTokenIssuer
             new(UserNameClaim, user.UserName),
         };
         claims.AddRange(roleIds.Select(roleId => new Claim(ClaimTypes.Role, roleId)));
+        if (mustChangePassword)
+        {
+            claims.Add(new Claim(MustChangePasswordClaim, MustChangePasswordClaimValue, ClaimValueTypes.Boolean));
+        }
 
         var credentials = new SigningCredentials(new SymmetricSecurityKey(keyBytes), SecurityAlgorithms.HmacSha256);
         var token = new JwtSecurityToken(

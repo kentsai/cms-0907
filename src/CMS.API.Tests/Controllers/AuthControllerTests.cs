@@ -19,6 +19,8 @@ namespace CMS.API.Tests.Controllers;
 public class AuthControllerTests
 {
     private const string Password = "Welcome123!";
+    /// <summary>SysConfig.appConfig.defaultPassword in these tests — deliberately not the user's own password.</summary>
+    private const string DefaultPassword = "Cms@Default2026";
     private const string SigningKey = "unit-test-symmetric-security-key-0123456789";
     private static readonly DateTimeOffset IssuedAt = new(2026, 9, 8, 9, 30, 0, TimeSpan.Zero);
 
@@ -49,7 +51,12 @@ public class AuthControllerTests
     {
         _repository.Setup(r => r.GetRoleIdsAsync(userId, It.IsAny<CancellationToken>())).ReturnsAsync(roleIds);
         _repository.Setup(r => r.GetSymmetricSecurityKeyAsync(It.IsAny<CancellationToken>())).ReturnsAsync(SigningKey);
+        _repository.Setup(r => r.GetDefaultPasswordAsync(It.IsAny<CancellationToken>())).ReturnsAsync(DefaultPassword);
     }
+
+    private static bool HasMustChangePasswordClaim(JwtSecurityToken jwt) =>
+        jwt.Claims.Any(c => c.Type == JwtTokenIssuer.MustChangePasswordClaim
+                            && string.Equals(c.Value, JwtTokenIssuer.MustChangePasswordClaimValue, StringComparison.OrdinalIgnoreCase));
 
     private static JwtSecurityToken DecodeAndValidate(string accessToken)
     {
@@ -222,6 +229,80 @@ public class AuthControllerTests
 
         _repository.Verify(r => r.GetRoleIdsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
         _repository.Verify(r => r.GetSymmetricSecurityKeyAsync(It.IsAny<CancellationToken>()), Times.Never);
+        _repository.Verify(r => r.GetDefaultPasswordAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    // ---- default password → must change it before anything else ----
+
+    [Fact]
+    public async Task Login_WithTheDefaultPassword_FlagsTheResponseAndTheToken()
+    {
+        var user = ActiveUser();
+        user.PasswordHash = PasswordHasher.Sha256Hex(DefaultPassword); // admin-seeded / reset account
+        _repository.Setup(r => r.GetCredentialAsync("helen", It.IsAny<CancellationToken>())).ReturnsAsync(user);
+        SetupSuccessPath("helen", ["Editor"]);
+
+        var result = await _controller.Login(Request(password: DefaultPassword), CancellationToken.None);
+
+        var body = Assert.IsType<LoginResponse>(Assert.IsType<OkObjectResult>(result.Result).Value);
+        Assert.True(body.MustChangePassword);
+        Assert.True(HasMustChangePasswordClaim(DecodeAndValidate(body.AccessToken)));
+    }
+
+    [Fact]
+    public async Task Login_WithAnOwnPassword_IsNotFlagged_AndTheTokenHasNoSuchClaim()
+    {
+        _repository.Setup(r => r.GetCredentialAsync("helen", It.IsAny<CancellationToken>())).ReturnsAsync(ActiveUser());
+        SetupSuccessPath("helen", ["Editor"]);
+
+        var result = await _controller.Login(Request(), CancellationToken.None);
+
+        var body = Assert.IsType<LoginResponse>(Assert.IsType<OkObjectResult>(result.Result).Value);
+        Assert.False(body.MustChangePassword);
+        var jwt = DecodeAndValidate(body.AccessToken);
+        Assert.False(HasMustChangePasswordClaim(jwt));
+        Assert.DoesNotContain(jwt.Claims, c => c.Type == JwtTokenIssuer.MustChangePasswordClaim);
+    }
+
+    [Fact]
+    public async Task Login_DefaultPasswordComparisonIsOrdinal_CaseDiffersMeansNotTheDefault()
+    {
+        // The stored hash is of the mixed-case variant, so the login succeeds, but it is not the configured default.
+        var user = ActiveUser();
+        user.PasswordHash = PasswordHasher.Sha256Hex(DefaultPassword.ToUpperInvariant());
+        _repository.Setup(r => r.GetCredentialAsync("helen", It.IsAny<CancellationToken>())).ReturnsAsync(user);
+        SetupSuccessPath("helen", []);
+
+        var result = await _controller.Login(Request(password: DefaultPassword.ToUpperInvariant()), CancellationToken.None);
+
+        var body = Assert.IsType<LoginResponse>(Assert.IsType<OkObjectResult>(result.Result).Value);
+        Assert.False(body.MustChangePassword);
+    }
+
+    [Fact]
+    public async Task Login_WrongPassword_NeverReadsTheDefaultPassword()
+    {
+        _repository.Setup(r => r.GetCredentialAsync("helen", It.IsAny<CancellationToken>())).ReturnsAsync(ActiveUser());
+
+        var result = await _controller.Login(Request(password: DefaultPassword), CancellationToken.None);
+
+        AssertGenericUnauthorized(result);
+    }
+
+    [Fact]
+    public async Task Login_Returns500Problem_WhenTheDefaultPasswordIsUnavailable()
+    {
+        _repository.Setup(r => r.GetCredentialAsync("helen", It.IsAny<CancellationToken>())).ReturnsAsync(ActiveUser());
+        _repository.Setup(r => r.GetRoleIdsAsync("helen", It.IsAny<CancellationToken>())).ReturnsAsync([]);
+        _repository.Setup(r => r.GetSymmetricSecurityKeyAsync(It.IsAny<CancellationToken>())).ReturnsAsync(SigningKey);
+        _repository.Setup(r => r.GetDefaultPasswordAsync(It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new AppConfigException("SysConfig 缺少 defaultPassword"));
+
+        var result = await _controller.Login(Request(), CancellationToken.None);
+
+        var problem = Assert.IsType<ObjectResult>(result.Result);
+        Assert.Equal(StatusCodes.Status500InternalServerError, problem.StatusCode);
+        Assert.Equal("SysConfig 缺少 defaultPassword", Assert.IsType<ProblemDetails>(problem.Value).Detail);
     }
 
     // ---- configuration errors ----
@@ -248,6 +329,7 @@ public class AuthControllerTests
         _repository.Setup(r => r.GetCredentialAsync("helen", It.IsAny<CancellationToken>())).ReturnsAsync(ActiveUser());
         _repository.Setup(r => r.GetRoleIdsAsync("helen", It.IsAny<CancellationToken>())).ReturnsAsync([]);
         _repository.Setup(r => r.GetSymmetricSecurityKeyAsync(It.IsAny<CancellationToken>())).ReturnsAsync("short");
+        _repository.Setup(r => r.GetDefaultPasswordAsync(It.IsAny<CancellationToken>())).ReturnsAsync(DefaultPassword);
 
         var result = await _controller.Login(Request(), CancellationToken.None);
 
@@ -262,8 +344,12 @@ public class AuthControllerTests
     {
         var names = typeof(LoginResponse).GetProperties(BindingFlags.Public | BindingFlags.Instance).Select(p => p.Name).ToList();
 
-        Assert.Equal(["UserId", "UserName", "AccessToken"], names);
-        Assert.DoesNotContain(names, n => n.Contains("Password", StringComparison.OrdinalIgnoreCase));
+        Assert.Equal(["UserId", "UserName", "AccessToken", "MustChangePassword"], names);
+        // MustChangePassword is a bool flag; no member can carry the hash or the password itself.
+        Assert.DoesNotContain(names, n => n.Contains("Hash", StringComparison.OrdinalIgnoreCase));
+        Assert.Equal(typeof(bool), typeof(LoginResponse).GetProperty(nameof(LoginResponse.MustChangePassword))!.PropertyType);
+        Assert.All(typeof(LoginResponse).GetProperties().Where(p => p.PropertyType == typeof(string)),
+            p => Assert.DoesNotContain("Password", p.Name, StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -284,7 +370,8 @@ public class AuthControllerTests
         // The JWT payload is only base64url-encoded, so check the decoded claims too.
         var jwt = new JwtSecurityTokenHandler().ReadJwtToken(Assert.IsType<LoginResponse>(ok.Value).AccessToken);
         Assert.DoesNotContain(jwt.Claims, c => c.Value.Equals(user.PasswordHash, StringComparison.OrdinalIgnoreCase));
-        Assert.DoesNotContain(jwt.Claims, c => c.Type.Contains("password", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(jwt.Claims, c => c.Type.Contains("hash", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(jwt.Claims, c => c.Value.Equals(Password, StringComparison.Ordinal));
     }
 
     // ---- Request validation ----

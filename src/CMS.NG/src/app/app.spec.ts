@@ -178,6 +178,29 @@ describe('App', () => {
     });
   });
 
+  describe('signed in with the default password (must change it first)', () => {
+    beforeEach(() => seedSignedInUser(['Admin'], '陳小美', true));
+
+    it('renders the topbar without the sidebar, the menu toggle or the profile link', async () => {
+      const fixture = await mount();
+
+      const el = fixture.nativeElement as HTMLElement;
+      expect(el.querySelector('.app-shell')?.classList).toContain('app-shell--locked');
+      expect(el.querySelector('.app-topbar')).not.toBeNull();
+      expect(el.querySelector('.app-sidebar')).toBeNull();
+      expect(el.querySelector('.app-topbar__toggle')).toBeNull();
+      expect(el.querySelector('a.app-topbar__user')).toBeNull();
+      expect(el.querySelector('.app-topbar__user')?.textContent).toContain('陳小美');
+      expect(el.querySelector('.app-topbar__user')?.textContent).toContain('請先變更密碼');
+    });
+
+    it('still offers 登出', async () => {
+      const fixture = await mount();
+
+      expect((fixture.nativeElement as HTMLElement).querySelector('.app-topbar__logout')).not.toBeNull();
+    });
+  });
+
   describe('signed out', () => {
     it('renders neither topbar nor sidebar, only the outlet', async () => {
       const fixture = await mount();

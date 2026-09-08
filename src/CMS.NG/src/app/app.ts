@@ -76,7 +76,9 @@ const MENU_ITEMS: MenuItem[] = [
 
 /**
  * App shell: topbar (signed-in user + logout) + collapsible sidebar + router outlet. The chrome is
- * only rendered while signed in, so the login page gets the full viewport.
+ * only rendered while signed in, so the login page gets the full viewport. While the session still has to
+ * change its default password (`AuthService.mustChangePassword`) the sidebar and the profile link are
+ * withheld as well — the change-password page is the only destination.
  */
 @Component({
   selector: 'app-root',

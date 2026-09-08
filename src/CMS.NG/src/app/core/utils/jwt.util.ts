@@ -6,6 +6,19 @@
 /** Claim names under which ASP.NET Core may serialise `ClaimTypes.Role`. */
 const ROLE_CLAIM_NAMES = ['role', 'roles', 'http://schemas.microsoft.com/ws/2008/06/identity/claims/role'];
 
+/** Claim the API adds to a token issued to a login that used the system default password (`JwtTokenIssuer.MustChangePasswordClaim`). */
+export const MUST_CHANGE_PASSWORD_CLAIM = 'mustChangePassword';
+
+/**
+ * True when the token carries the must-change-password claim: the API then answers 403 to everything except
+ * the password change, so the app must keep the user on the change-password page. The claim is written as a
+ * JSON boolean, but a string `"true"` is accepted as well.
+ */
+export function mustChangePasswordFromToken(token: string | null | undefined): boolean {
+  const value = decodeJwtPayload(token)?.[MUST_CHANGE_PASSWORD_CLAIM];
+  return value === true || (typeof value === 'string' && value.toLowerCase() === 'true');
+}
+
 /** Decodes the payload segment of a JWT, or returns null for anything that is not a three-part token with a JSON object payload. */
 export function decodeJwtPayload(token: string | null | undefined): Record<string, unknown> | null {
   if (!token) {

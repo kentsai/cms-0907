@@ -3,7 +3,7 @@ import { HttpClient, HttpErrorResponse, provideHttpClient, withInterceptors } fr
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { Router, provideRouter } from '@angular/router';
 import { environment } from '@environments/environment';
-import { AUTH_PROFILE_KEY, LOGIN_PATH } from '@core/services/auth.service';
+import { AUTH_PROFILE_KEY, CHANGE_PASSWORD_PATH, LOGIN_PATH } from '@core/services/auth.service';
 import { seedSignedInUser } from '@app/testing/auth-testing';
 import { authInterceptor } from './auth.interceptor';
 
@@ -80,6 +80,41 @@ describe('authInterceptor', () => {
 
     expect(sessionStorage.getItem(AUTH_PROFILE_KEY)).not.toBeNull();
     expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it('on 403 for a default-password session goes to the change-password page but keeps the session', () => {
+    seedSignedInUser(['Editor'], '王大明', true);
+    setup();
+    let caught: unknown;
+
+    http.get(apiUrl).subscribe({ error: err => (caught = err) });
+    backend.expectOne(apiUrl).flush({ message: '請先變更密碼後再使用系統。' }, { status: 403, statusText: 'Forbidden' });
+
+    expect(sessionStorage.getItem(AUTH_PROFILE_KEY)).not.toBeNull();
+    expect(navigate).toHaveBeenCalledWith(CHANGE_PASSWORD_PATH);
+    expect((caught as HttpErrorResponse).status).toBe(403);
+  });
+
+  it('leaves a 403 alone for an ordinary session', () => {
+    seedSignedInUser();
+    setup();
+
+    http.get(apiUrl).subscribe({ error: () => undefined });
+    backend.expectOne(apiUrl).flush(null, { status: 403, statusText: 'Forbidden' });
+
+    expect(sessionStorage.getItem(AUTH_PROFILE_KEY)).not.toBeNull();
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it('still signs a default-password session out on 401', () => {
+    seedSignedInUser(['Editor'], '王大明', true);
+    setup();
+
+    http.get(apiUrl).subscribe({ error: () => undefined });
+    backend.expectOne(apiUrl).flush(null, { status: 401, statusText: 'Unauthorized' });
+
+    expect(sessionStorage.getItem(AUTH_PROFILE_KEY)).toBeNull();
+    expect(navigate).toHaveBeenCalledWith(LOGIN_PATH);
   });
 
   it('does not treat a 401 from the login endpoint as an expired session', () => {
