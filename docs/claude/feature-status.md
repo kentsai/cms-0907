@@ -37,6 +37,15 @@ DisplayOrder column).
 (`courseShowUrl` in `course.model.ts`), captioned with `courseId`, downloadable as
 `{courseId}.png`. Deliberately **not** built from the sample spec: `/copy`, print-to-PDF,
 CourseRelatedLink / CourseRecomm sub-panels; `ClassSection` is not in the schema.
+The **list page edits cells in place**: double-click (never single-click) opens a PrimeNG
+editor matching the column, blur / Enter / option-select commits, Escape cancels; `主代碼`,
+`原廠`, `課程群組` stay read-only. State, validation (same rules as the form, plus
+`scheduleOn ≤ scheduleOff` against the row) and draft→model conversion live in
+`course-list/course-inline-edit.ts`; the component owns the editing state itself rather than
+using `pEditableColumn`, whose host listener is hard-wired to single click. A commit is
+optimistic: the row is patched, then `getById` (for the N-N lists the list rows lack) →
+`update` with every editable column taken from the list row; on error the cell reverts and a
+toast is shown. Inline errors keep the cell open and block opening another cell.
 
 **Certification** (`spec\course\Certification.md`) — int IDENTITY PK, required `Partner_pkid`
 (JOINed as `partnerName`), nullable **`nchar(100)` Title** (`RTRIM` in every SELECT, blank → NULL

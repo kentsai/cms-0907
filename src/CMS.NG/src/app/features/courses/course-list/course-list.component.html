@@ -56,20 +56,155 @@
       </ng-template>
       <ng-template #body let-item>
         <tr>
-          <td class="col-pkid">{{ item.pkid }}</td>
-          <td class="col-order">{{ item.displayOrder }}</td>
-          <td class="col-code"><code>{{ item.courseId }}</code></td>
-          <td class="col-code"><code>{{ item.prodCourseId }}</code></td>
-          <td class="col-title">{{ item.title }}</td>
-          <td>{{ item.partnerName }}</td>
-          <td class="muted-if-empty">{{ item.courseGroupDescription || '—' }}</td>
-          <td>{{ item.publishStatusDescription }}</td>
-          <td class="col-date">{{ item.scheduleOn }}</td>
-          <td class="col-date">{{ item.scheduleOff }}</td>
-          <td class="col-num">{{ item.hour }}</td>
-          <td class="col-num">{{ item.listPrice | number:'1.0-0' }}</td>
-          <td class="col-num">{{ item.learningCredit | number:'1.1-1' }}</td>
-          <td class="col-bool">{{ item.canRepeat ? '是' : '否' }}</td>
+          <!-- Read-only: primary key -->
+          <td class="col-pkid" data-field="pkid">{{ item.pkid }}</td>
+
+          <td class="col-order editable" data-field="displayOrder"
+              [class.editing]="editorFor(item, 'displayOrder')"
+              (dblclick)="startEdit(item, 'displayOrder')" (keydown.escape)="cancelEdit()">
+            @if (editorFor(item, 'displayOrder'); as e) {
+              <p-inputnumber [(ngModel)]="e.value" [useGrouping]="false" [pAutoFocus]="true"
+                             inputStyleClass="cell-input" [class.cell-invalid]="!!e.error"
+                             (onBlur)="commit()" (keydown.enter)="commit()" />
+              @if (e.error) { <small class="cell-error">{{ e.error }}</small> }
+            } @else {
+              {{ item.displayOrder }}
+            }
+          </td>
+
+          <td class="col-code editable" data-field="courseId"
+              [class.editing]="editorFor(item, 'courseId')"
+              (dblclick)="startEdit(item, 'courseId')" (keydown.escape)="cancelEdit()">
+            @if (editorFor(item, 'courseId'); as e) {
+              <input pInputText class="cell-input" [(ngModel)]="e.value" maxlength="50" autocomplete="off"
+                     [pAutoFocus]="true" [class.cell-invalid]="!!e.error"
+                     (blur)="commit()" (keydown.enter)="commit()" />
+              @if (e.error) { <small class="cell-error">{{ e.error }}</small> }
+            } @else {
+              <code>{{ item.courseId }}</code>
+            }
+          </td>
+
+          <td class="col-code editable" data-field="prodCourseId"
+              [class.editing]="editorFor(item, 'prodCourseId')"
+              (dblclick)="startEdit(item, 'prodCourseId')" (keydown.escape)="cancelEdit()">
+            @if (editorFor(item, 'prodCourseId'); as e) {
+              <input pInputText class="cell-input" [(ngModel)]="e.value" maxlength="50" autocomplete="off"
+                     [pAutoFocus]="true" [class.cell-invalid]="!!e.error"
+                     (blur)="commit()" (keydown.enter)="commit()" />
+              @if (e.error) { <small class="cell-error">{{ e.error }}</small> }
+            } @else {
+              <code>{{ item.prodCourseId }}</code>
+            }
+          </td>
+
+          <td class="col-title editable" data-field="title"
+              [class.editing]="editorFor(item, 'title')"
+              (dblclick)="startEdit(item, 'title')" (keydown.escape)="cancelEdit()">
+            @if (editorFor(item, 'title'); as e) {
+              <input pInputText class="cell-input" [(ngModel)]="e.value" maxlength="200" autocomplete="off"
+                     [pAutoFocus]="true" [class.cell-invalid]="!!e.error"
+                     (blur)="commit()" (keydown.enter)="commit()" />
+              @if (e.error) { <small class="cell-error">{{ e.error }}</small> }
+            } @else {
+              {{ item.title }}
+            }
+          </td>
+
+          <!-- Read-only: FK lookup labels -->
+          <td data-field="partnerName">{{ item.partnerName }}</td>
+          <td class="muted-if-empty" data-field="courseGroupDescription">{{ item.courseGroupDescription || '—' }}</td>
+
+          <td class="col-status editable" data-field="publishStatusPkid"
+              [class.editing]="editorFor(item, 'publishStatusPkid')"
+              (dblclick)="startEdit(item, 'publishStatusPkid')" (keydown.escape)="cancelEdit()">
+            @if (editorFor(item, 'publishStatusPkid'); as e) {
+              <p-select #statusEditor [(ngModel)]="e.value" [options]="publishStatuses()" optionLabel="label" optionValue="pkid"
+                        appendTo="body" styleClass="cell-input" [autofocus]="true" [class.cell-invalid]="!!e.error"
+                        (onChange)="commit()" (onBlur)="!statusEditor.overlayVisible && commit()" />
+              @if (e.error) { <small class="cell-error">{{ e.error }}</small> }
+            } @else {
+              {{ item.publishStatusDescription }}
+            }
+          </td>
+
+          <td class="col-date editable" data-field="scheduleOn"
+              [class.editing]="editorFor(item, 'scheduleOn')"
+              (dblclick)="startEdit(item, 'scheduleOn')" (keydown.escape)="cancelEdit()">
+            @if (editorFor(item, 'scheduleOn'); as e) {
+              <p-datepicker #onEditor [(ngModel)]="e.value" dateFormat="yy-mm-dd" appendTo="body" styleClass="cell-input"
+                            [autofocus]="true" [class.cell-invalid]="!!e.error"
+                            (onSelect)="commit()" (onClose)="commit()" (onBlur)="!onEditor.overlayVisible && commit()" />
+              @if (e.error) { <small class="cell-error">{{ e.error }}</small> }
+            } @else {
+              {{ item.scheduleOn }}
+            }
+          </td>
+
+          <td class="col-date editable" data-field="scheduleOff"
+              [class.editing]="editorFor(item, 'scheduleOff')"
+              (dblclick)="startEdit(item, 'scheduleOff')" (keydown.escape)="cancelEdit()">
+            @if (editorFor(item, 'scheduleOff'); as e) {
+              <p-datepicker #offEditor [(ngModel)]="e.value" dateFormat="yy-mm-dd" appendTo="body" styleClass="cell-input"
+                            [autofocus]="true" [class.cell-invalid]="!!e.error"
+                            (onSelect)="commit()" (onClose)="commit()" (onBlur)="!offEditor.overlayVisible && commit()" />
+              @if (e.error) { <small class="cell-error">{{ e.error }}</small> }
+            } @else {
+              {{ item.scheduleOff }}
+            }
+          </td>
+
+          <td class="col-num editable" data-field="hour"
+              [class.editing]="editorFor(item, 'hour')"
+              (dblclick)="startEdit(item, 'hour')" (keydown.escape)="cancelEdit()">
+            @if (editorFor(item, 'hour'); as e) {
+              <p-inputnumber [(ngModel)]="e.value" [useGrouping]="false" [pAutoFocus]="true"
+                             inputStyleClass="cell-input" [class.cell-invalid]="!!e.error"
+                             (onBlur)="commit()" (keydown.enter)="commit()" />
+              @if (e.error) { <small class="cell-error">{{ e.error }}</small> }
+            } @else {
+              {{ item.hour }}
+            }
+          </td>
+
+          <td class="col-num editable" data-field="listPrice"
+              [class.editing]="editorFor(item, 'listPrice')"
+              (dblclick)="startEdit(item, 'listPrice')" (keydown.escape)="cancelEdit()">
+            @if (editorFor(item, 'listPrice'); as e) {
+              <p-inputnumber [(ngModel)]="e.value" mode="decimal" [minFractionDigits]="0" [maxFractionDigits]="0"
+                             [pAutoFocus]="true" inputStyleClass="cell-input" [class.cell-invalid]="!!e.error"
+                             (onBlur)="commit()" (keydown.enter)="commit()" />
+              @if (e.error) { <small class="cell-error">{{ e.error }}</small> }
+            } @else {
+              {{ item.listPrice | number:'1.0-0' }}
+            }
+          </td>
+
+          <td class="col-num editable" data-field="learningCredit"
+              [class.editing]="editorFor(item, 'learningCredit')"
+              (dblclick)="startEdit(item, 'learningCredit')" (keydown.escape)="cancelEdit()">
+            @if (editorFor(item, 'learningCredit'); as e) {
+              <p-inputnumber [(ngModel)]="e.value" mode="decimal" [minFractionDigits]="1" [maxFractionDigits]="1" [useGrouping]="false"
+                             [pAutoFocus]="true" inputStyleClass="cell-input" [class.cell-invalid]="!!e.error"
+                             (onBlur)="commit()" (keydown.enter)="commit()" />
+              @if (e.error) { <small class="cell-error">{{ e.error }}</small> }
+            } @else {
+              {{ item.learningCredit | number:'1.1-1' }}
+            }
+          </td>
+
+          <td class="col-bool editable" data-field="canRepeat"
+              [class.editing]="editorFor(item, 'canRepeat')"
+              (dblclick)="startEdit(item, 'canRepeat')" (keydown.escape)="cancelEdit()">
+            @if (editorFor(item, 'canRepeat'); as e) {
+              <p-checkbox [(ngModel)]="e.value" [binary]="true" [autofocus]="true"
+                          (onChange)="commit()" (onBlur)="commit()" />
+              @if (e.error) { <small class="cell-error">{{ e.error }}</small> }
+            } @else {
+              {{ item.canRepeat ? '是' : '否' }}
+            }
+          </td>
+
           <td class="col-actions">
             <p-button icon="pi pi-eye" [text]="true" [rounded]="true" size="small" pTooltip="檢視" tooltipPosition="top" (onClick)="view(item)" />
             <p-button icon="pi pi-pencil" [text]="true" [rounded]="true" size="small" pTooltip="編輯" tooltipPosition="top" (onClick)="edit(item)" />

@@ -54,5 +54,6 @@ cd C:\dev\cms\src\CMS.NG; npx ng test --watch=false --browsers=ChromeHeadless
 
 Built: PublishStatus, AppRole, AppUser, Partner, CourseGroup, Course, Certification, and the
 custom FeaturedPromoItem weekly board (`首頁 Home` menu). Course detail also shows a
-downloadable QR code (`core/components/qr-code`, `qrcode` npm package). 207 xUnit + 254 Karma
+downloadable QR code (`core/components/qr-code`, `qrcode` npm package), and the Course list
+edits cells in place on double-click (`course-list/course-inline-edit.ts`). 207 xUnit + 272 Karma
 tests pass. Remaining tables are listed in `docs\claude\feature-status.md`.
