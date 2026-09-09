@@ -90,7 +90,10 @@ export class App {
   protected readonly auth = inject(AuthService);
 
   protected readonly title = signal('CMS');
-  protected readonly sidebarCollapsed = signal(false);
+  /** Starts collapsed on narrow viewports (phones), where the sidebar is an overlay rather than a column. */
+  protected readonly sidebarCollapsed = signal(
+    typeof window !== 'undefined' && window.matchMedia?.('(max-width: 640px)').matches === true
+  );
 
   /** The full menu for Admins; everyone else gets it without the `系統管理 Admin` group. */
   protected readonly menuItems = computed<MenuItem[]>(() =>
