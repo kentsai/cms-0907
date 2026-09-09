@@ -98,6 +98,11 @@ export function toUtcIso(dateTime: string): string {
       white-space: nowrap;
     }
     .row-audit-badge__label { font-weight: 600; }
+    /* Phones: the badge may wrap onto two lines rather than force the toolbar wider than the screen. */
+    @media (max-width: 640px) {
+      :host { min-width: 0; max-width: 100%; }
+      :host ::ng-deep .row-audit-badge { white-space: normal; text-align: left; }
+    }
     .row-audit-badge__latest {
       padding-left: 0.5rem;
       border-left: 1px solid var(--p-content-border-color);

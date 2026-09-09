@@ -27,6 +27,19 @@ body {
   font-weight: 600;
 }
 
+/* Detail / edit toolbars (`.toolbar-title` + `.toolbar-actions`, shared by every feature page) on phones:
+   let the title row wrap instead of shrinking the heading to one character per line and overflowing sideways. */
+@media (max-width: 640px) {
+  .toolbar-title,
+  .toolbar-actions {
+    flex-wrap: wrap;
+  }
+
+  .toolbar-title h1 {
+    white-space: nowrap;
+  }
+}
+
 .field {
   display: flex;
   flex-direction: column;
