@@ -155,18 +155,26 @@ if bulk or email delivery is ever required.
   `"Microsoft JhengHei", "PingFang TC", "Noto Sans TC", system-ui, sans-serif`, no color.
 - Screen view of the same route shows the page on a gray background with the 列印 button, so the
   rep can preview before printing.
+- The `@page` rules and the print font stack live in `course-print.component.scss` (eng review
+  1A). Angular's emulated encapsulation should pass `@page` through untouched because it has no
+  element selector; this is verified once at implementation by opening the print preview in Edge
+  and Chrome and confirming the margin boxes render and the browser URL/date header is gone.
 
 ### Shell change
 
 The root `App` component cannot read leaf route data from its own injected `ActivatedRoute`
 (that is the root route). Instead `app.ts` subscribes to `router.events` filtered to
 `NavigationEnd`, walks `router.routerState.root` down `firstChild` to the leaf, reads
-`snapshot.data['chromeless']`, and exposes it as a `chromeless` signal. When true, `app.html`
-renders **only** `<router-outlet>`: the whole `<div class="app-shell">` wrapper (100vh grid with
-`overflow: auto` on the content pane) is skipped, not just the topbar and sidebar. Skipping the
-wrapper is what avoids the "only page 1 prints" pitfall that ruled out Approach A. `<p-toast>`
-and `<p-confirmdialog>`, which sit outside the wrapper today, are also omitted in chromeless
-mode; the print page uses plain text for its two error states and never needs them.
+`snapshot.data['chromeless']`, and exposes it as a `chromeless` signal. (Eng review 3A.) The
+signal is bound as `[class.app-shell--chromeless]` on the existing wrapper, the same mechanism
+as the `--anonymous` login-page modifier already in `app.scss`. The modifier neutralises the
+grid for printing: `display: block; height: auto;` on `.app-shell--chromeless`, and
+`overflow: visible; padding: 0; background: none;` on its `.app-content`. The topbar and
+sidebar are not rendered (the template's `@if (auth.isAuthenticated())` block gains
+`&& !chromeless()`). `<p-toast>` and `<p-confirmdialog>` stay exactly as they are: they
+render nothing unless a message is pushed, and the print page never pushes one. Removing the
+`height: 100vh` grid and the `overflow: auto` pane is what avoids the "only page 1 prints"
+pitfall that ruled out Approach A.
 
 This is the one cross-cutting change. The existing `app.spec.ts` sidebar tests must stay green.
 Testing the flag needs a real route and `navigateByUrl` (or `RouterTestingHarness`), not the
@@ -251,3 +259,22 @@ Questions 1 to 3.
   Choosing the smaller thing on purpose, with the upgrade path named, is how wedges get shipped.
 - You agreed to all five premises in one move, including the branch-state one. You read the
   constraint and accepted the cost rather than arguing with it.
+
+## As built (2026-09-09, commit 1dc8644 on `feature-course-pdf`)
+
+Implementation record: `plans/2026-09-09-course-print-pdf.md`. Everything above is built as written except
+two deliberate variants and two answered questions:
+
+- **Shell (3A variant).** The single `<router-outlet>` and the neutralised grid are as specified, but
+  `app.html` reaches them by dropping the `.app-shell` / `.app-content` classes on chromeless routes rather
+  than adding an `--chromeless` modifier, and `<p-toast>` / `<p-confirmdialog>` are omitted too (this matches
+  Premise 3 and the Tests row above; the print page shows plain-text errors, and a customer preview must never
+  pop an admin toast, which the 500 interceptor would otherwise do on that tab). `CLAUDE.md` records the rule.
+- **Styles (1A variant).** `@page` and the font stack live in `course-print.component.scss` as planned, with
+  `ViewEncapsulation.None` and every non-`@page` rule scoped under `.course-print`. Verified with Playwright's
+  Chromium: all six margin boxes parse, the output is A4 across two pages, and `window.print` fires once.
+- **Open Question 2** 定價: shown (`NT$` prefix, `number:'1.0-0'`).
+- **Open Question 3** 備註 / 其他資訊: both printed; empty blocks omitted.
+
+Still manual: Open Question 1 and The Assignment (the rep's brochures), and the Success Criteria checks on the
+rep's own Edge/Chrome ≥ 131 (footer margin boxes with 頁首及頁尾 at default, CJK glyphs, default file name).
