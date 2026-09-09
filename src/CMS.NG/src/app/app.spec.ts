@@ -46,7 +46,7 @@ describe('App', () => {
       const fixture = await mount();
 
       const compiled = fixture.nativeElement as HTMLElement;
-      expect(compiled.querySelector('.app-topbar__title')?.textContent).toContain('CMS');
+      expect(compiled.querySelector('.app-topbar__title')?.textContent).toContain('CMS-React');
     });
 
     it('should show the signed-in UserName in the topbar', async () => {

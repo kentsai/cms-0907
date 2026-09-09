@@ -89,7 +89,7 @@ const MENU_ITEMS: MenuItem[] = [
 export class App {
   protected readonly auth = inject(AuthService);
 
-  protected readonly title = signal('CMS');
+  protected readonly title = signal('CMS-React');
   /** Starts collapsed on narrow viewports (phones), where the sidebar is an overlay rather than a column. */
   protected readonly sidebarCollapsed = signal(
     typeof window !== 'undefined' && window.matchMedia?.('(max-width: 640px)').matches === true
