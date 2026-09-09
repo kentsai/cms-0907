@@ -91,6 +91,10 @@ builder.Services.AddScoped<IFeaturedPromoItemRepository, FeaturedPromoItemReposi
 
 var app = builder.Build();
 
+// First in the pipeline so it wraps everything below: any exception no controller mapped is logged in full and
+// answered with 500 + { message, traceId } (see GlobalExceptionMiddleware).
+app.UseMiddleware<GlobalExceptionMiddleware>();
+
 app.UseSwagger();
 app.UseSwaggerUI(options => options.SwaggerEndpoint("/swagger/v1/swagger.json", "CMS API v1"));
 

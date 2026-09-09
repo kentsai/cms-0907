@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
 using Moq;
 
 namespace CMS.API.Tests.Infrastructure;
@@ -26,6 +27,9 @@ public sealed class CmsApiFactory : WebApplicationFactory<Program>
     public Mock<IAuthRepository> AuthRepository { get; } = new(MockBehavior.Strict);
     public Mock<IPublishStatusRepository> PublishStatusRepository { get; } = new(MockBehavior.Strict);
     public Mock<IRowAuditRepository> RowAuditRepository { get; } = new(MockBehavior.Strict);
+
+    /// <summary>Everything the hosted API logged, so a test can assert what reached the server log and what did not.</summary>
+    public CapturingLoggerProvider Logs { get; } = new();
 
     public CmsApiFactory()
     {
@@ -72,6 +76,8 @@ public sealed class CmsApiFactory : WebApplicationFactory<Program>
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        builder.ConfigureLogging(logging => logging.AddProvider(Logs));
+
         // Runs after Program.cs registered its services, so these replace the Dapper implementations.
         builder.ConfigureServices(services =>
         {
