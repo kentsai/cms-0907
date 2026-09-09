@@ -1,9 +1,15 @@
+<!--
+  One router-outlet for both modes. On a chromeless route (data.chromeless, e.g. the course print view) the
+  wrapper loses the shell grid, the topbar / sidebar / toast / confirm dialog are not rendered and <main> has no
+  padding or scrolling pane, so the routed page is the whole document. The outlet itself must not sit inside an
+  @if: re-creating it re-activates the route and instantiates the routed component a second time.
+-->
 <div
-  class="app-shell"
-  [class.app-shell--collapsed]="sidebarCollapsed()"
-  [class.app-shell--anonymous]="!auth.isAuthenticated()"
-  [class.app-shell--locked]="auth.mustChangePassword()">
-  @if (auth.isAuthenticated()) {
+  [class.app-shell]="!chromeless()"
+  [class.app-shell--collapsed]="!chromeless() && sidebarCollapsed()"
+  [class.app-shell--anonymous]="!chromeless() && !auth.isAuthenticated()"
+  [class.app-shell--locked]="!chromeless() && auth.mustChangePassword()">
+  @if (!chromeless() && auth.isAuthenticated()) {
     <header class="app-topbar">
       @if (!auth.mustChangePassword()) {
         <button
@@ -56,11 +62,13 @@
     }
   }
 
-  <main class="app-content">
+  <main [class.app-content]="!chromeless()">
     <router-outlet />
   </main>
 </div>
 
-<!-- Shared once at shell level; feature pages only inject MessageService / ConfirmationService. -->
-<p-toast position="top-right" />
-<p-confirmdialog />
+@if (!chromeless()) {
+  <!-- Shared once at shell level; feature pages only inject MessageService / ConfirmationService. -->
+  <p-toast position="top-right" />
+  <p-confirmdialog />
+}

@@ -187,6 +187,14 @@ const featureRoutes: Routes = [
         loadComponent: () =>
           import('@features/courses/course-form/course-form.component')
             .then(m => m.CourseFormComponent)
+      },
+      {
+        // 列印PDF: customer-facing print view opened in a new tab; `chromeless` drops the shell (see app.ts).
+        path: ':id/print',
+        data: { chromeless: true },
+        loadComponent: () =>
+          import('@features/courses/course-print/course-print.component')
+            .then(m => m.CoursePrintComponent)
       }
     ]
   },

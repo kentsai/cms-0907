@@ -1,0 +1,73 @@
+@if (loading()) {
+  <p class="course-print__state">載入中…</p>
+} @else if (notFound()) {
+  <p class="course-print__state">找不到主代碼 {{ pkid }} 的課程</p>
+} @else if (failed()) {
+  <p class="course-print__state">無法取得課程資料</p>
+} @else if (item(); as it) {
+  <!-- Screen only: the browser's print dialog is the PDF; this re-opens it after a cancel. -->
+  <div class="course-print__actions">
+    <p-button label="列印" icon="pi pi-print" (onClick)="print()" />
+  </div>
+
+  <article class="course-print__sheet">
+    <header class="course-print__head">
+      <div class="course-print__identity">
+        <h1 class="course-print__title">{{ it.title }}</h1>
+        @if (officialTitle()) {
+          <p class="course-print__official">{{ officialTitle() }}</p>
+        }
+        <dl class="course-print__codes">
+          <dt>簡介代碼</dt>
+          <dd><code>{{ it.courseId }}</code></dd>
+          <dt>科目代碼</dt>
+          <dd><code>{{ it.prodCourseId }}</code></dd>
+          <dt>原廠</dt>
+          <dd>{{ it.partnerName }}</dd>
+          @if (courseGroup()) {
+            <dt>課程群組</dt>
+            <dd>{{ courseGroup() }}</dd>
+          }
+        </dl>
+      </div>
+      @if (showQr()) {
+        <!-- Published courses only: the public course page (and so this link) does not exist before publication. -->
+        <aside class="course-print__qr">
+          <app-qr-code
+            [text]="qrUrl()"
+            [title]="it.courseId"
+            [size]="128"
+            [showDownload]="false"
+            (settled)="onQrSettled()" />
+          <span class="course-print__qr-url">{{ qrUrl() }}</span>
+        </aside>
+      }
+    </header>
+
+    <dl class="course-print__numbers">
+      <div>
+        <dt>時數</dt>
+        <dd>{{ it.hour }}</dd>
+      </div>
+      <div>
+        <dt>定價</dt>
+        <dd>NT$ {{ it.listPrice | number:'1.0-0' }}</dd>
+      </div>
+      <div>
+        <dt>點數</dt>
+        <dd>{{ it.learningCredit | number:'1.1-1' }}</dd>
+      </div>
+      <div>
+        <dt>允許重聽</dt>
+        <dd>{{ it.canRepeat ? '是' : '否' }}</dd>
+      </div>
+    </dl>
+
+    @for (section of sections(); track section.label) {
+      <section class="course-print__section" [class.course-print__section--flow]="section.label === flowingSectionLabel">
+        <h2>{{ section.label }}</h2>
+        <p>{{ section.text }}</p>
+      </section>
+    }
+  </article>
+}

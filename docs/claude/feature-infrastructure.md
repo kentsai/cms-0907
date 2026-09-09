@@ -198,6 +198,17 @@ Current menu:
 and `ConfirmationService` are provided app-wide in `app.config.ts`. Feature pages only
 inject them.
 
+**Chromeless routes.** A route declared with `data: { chromeless: true }` (key
+`CHROMELESS_ROUTE_DATA` in `app.ts`; today only the course print view `/course/courses/:id/print`)
+makes the shell render nothing around the outlet: no `.app-shell` grid, topbar, sidebar, toast
+or confirm dialog, and `<main>` loses `.app-content` (padding / scrolling pane). `app.ts`
+re-evaluates the flag on every `NavigationEnd` by walking `router.routerState.root` down to the
+leaf (`isChromelessRoute`). The single `<router-outlet>` stays in place and only classes / siblings
+toggle: an outlet re-created inside an `@if` re-activates the route and instantiates the routed
+component twice. Such a page cannot toast, so it renders its own plain-text error states, and its
+styles may use `ViewEncapsulation.None` when they need `@page` / `@media print`. Spec pattern:
+`app.spec.ts` mounts the shell with real stub routes and `Router.navigateByUrl`.
+
 ### Testing rules
 
 - Karma + Jasmine (Angular default) — do not migrate to Vitest/Jest.

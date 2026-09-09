@@ -1,0 +1,208 @@
+// Global stylesheet (ViewEncapsulation.None): every rule is scoped under `.course-print` except `@page`, which
+// cannot be scoped. The footer margin boxes read custom properties the component sets on <html> while it lives;
+// on any other page they resolve to nothing, so no footer text appears there.
+
+@page {
+  size: A4;
+  margin: 15mm;
+
+  // Replace the browser's default header (URL, title, date) and footer ("1/2") — Chrome / Edge 131+.
+  @top-left {
+    content: '';
+  }
+  @top-center {
+    content: '';
+  }
+  @top-right {
+    content: '';
+  }
+  @bottom-left {
+    content: '簡介代碼 ' var(--print-course-id);
+    font-size: 8.5pt;
+    color: #777;
+  }
+  @bottom-center {
+    content: '列印日期 ' var(--print-date);
+    font-size: 8.5pt;
+    color: #777;
+  }
+  @bottom-right {
+    content: '第 ' counter(page) ' 頁';
+    font-size: 8.5pt;
+    color: #777;
+  }
+}
+
+.course-print {
+  display: block;
+  min-height: 100vh;
+  padding: 12px;
+  background: #e5e5e5;
+  color: #222;
+  // Name a CJK face explicitly: the print dialog on some machines drops glyphs from a generic stack.
+  font-family: 'Microsoft JhengHei', 'PingFang TC', 'Noto Sans TC', system-ui, sans-serif;
+}
+
+.course-print__state {
+  max-width: 210mm;
+  margin: 24px auto;
+  font-size: 12pt;
+}
+
+.course-print__actions {
+  display: flex;
+  justify-content: flex-end;
+  max-width: 210mm;
+  margin: 0 auto 12px;
+}
+
+// The on-screen preview is the A4 sheet itself; under print the sheet becomes the page.
+.course-print__sheet {
+  width: 210mm;
+  max-width: 100%;
+  min-height: 297mm;
+  margin: 0 auto;
+  padding: 15mm;
+  border: 1px solid #bbb;
+  background: #fff;
+}
+
+.course-print__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8mm;
+  padding-bottom: 5mm;
+  border-bottom: 1px solid #999;
+}
+
+.course-print__identity {
+  min-width: 0;
+  flex: 1;
+}
+
+.course-print__title {
+  margin: 0 0 2mm;
+  font-size: 20pt;
+}
+
+.course-print__official {
+  margin: 0 0 4mm;
+  color: #666;
+  font-size: 11pt;
+}
+
+.course-print__codes {
+  display: grid;
+  grid-template-columns: 22mm 1fr;
+  row-gap: 1.5mm;
+  margin: 0;
+  font-size: 10.5pt;
+
+  dt {
+    color: #666;
+  }
+
+  dd {
+    margin: 0;
+  }
+
+  code {
+    font-family: Consolas, monospace;
+  }
+}
+
+.course-print__qr {
+  flex: none;
+  width: 42mm;
+  text-align: center;
+  font-size: 8.5pt;
+  color: #666;
+
+  .qr-code {
+    padding: 0;
+    border: none;
+  }
+
+  .qr-code__title {
+    font-family: Consolas, monospace;
+  }
+}
+
+.course-print__qr-url {
+  display: block;
+  margin-top: 1mm;
+  word-break: break-all;
+}
+
+.course-print__numbers {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  margin: 5mm 0;
+  border: 1px solid #999;
+
+  > div {
+    padding: 2.5mm 3mm;
+    border-right: 1px solid #ccc;
+
+    &:last-child {
+      border-right: 0;
+    }
+  }
+
+  dt {
+    color: #666;
+    font-size: 9pt;
+  }
+
+  dd {
+    margin: 0;
+    font-size: 13pt;
+    font-weight: 600;
+  }
+}
+
+.course-print__section {
+  margin-top: 4mm;
+  break-inside: avoid-page;
+
+  h2 {
+    margin: 0 0 1.5mm;
+    padding-bottom: 1mm;
+    border-bottom: 1px solid #ccc;
+    font-size: 11.5pt;
+    break-after: avoid-page;
+  }
+
+  p {
+    margin: 0;
+    white-space: pre-wrap;
+    font-size: 10.5pt;
+    line-height: 1.5;
+  }
+}
+
+// 課程大綱 may span pages; its heading still stays with the first lines (break-after on h2).
+.course-print__section--flow {
+  break-inside: auto;
+}
+
+@media print {
+  .course-print {
+    min-height: 0;
+    padding: 0;
+    background: #fff;
+  }
+
+  .course-print__actions {
+    display: none;
+  }
+
+  .course-print__sheet {
+    width: auto;
+    max-width: none;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    border: none;
+  }
+}

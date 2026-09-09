@@ -1,10 +1,12 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  DestroyRef,
   ElementRef,
   effect,
   inject,
   input,
+  output,
   signal,
   untracked,
   viewChild
@@ -28,15 +30,17 @@ import { QrCodeService } from '@core/services/qr-code.service';
       @if (error()) {
         <span class="qr-code__error">無法產生 QR Code</span>
       }
-      <p-button
-        class="qr-code__download"
-        label="下載 QR Code"
-        icon="pi pi-download"
-        severity="secondary"
-        size="small"
-        [outlined]="true"
-        [disabled]="!ready()"
-        (onClick)="download()" />
+      @if (showDownload()) {
+        <p-button
+          class="qr-code__download"
+          label="下載 QR Code"
+          icon="pi pi-download"
+          severity="secondary"
+          size="small"
+          [outlined]="true"
+          [disabled]="!ready()"
+          (onClick)="download()" />
+      }
     </figure>
   `,
   styles: `
@@ -74,13 +78,21 @@ export class QrCodeComponent {
   readonly fileName = input<string | null>(null);
   /** Edge length of the on-screen symbol in pixels. */
   readonly size = input(160);
+  /** Whether the 下載 QR Code button is rendered (off for customer-facing views such as the print page). */
+  readonly showDownload = input(true);
+  /** Emits once per render, after the symbol is drawn (`'ready'`) or encoding failed (`'error'`). */
+  readonly settled = output<'ready' | 'error'>();
 
   private readonly canvas = viewChild.required<ElementRef<HTMLCanvasElement>>('canvas');
 
   protected readonly ready = signal(false);
   protected readonly error = signal(false);
 
+  /** Rendering is async; an emit after the component is gone would be an error (NG0953). */
+  private destroyed = false;
+
   constructor() {
+    inject(DestroyRef).onDestroy(() => (this.destroyed = true));
     effect(() => {
       const canvas = this.canvas().nativeElement;
       const text = this.text();
@@ -128,11 +140,17 @@ export class QrCodeComponent {
   private async render(canvas: HTMLCanvasElement, text: string, size: number): Promise<void> {
     this.ready.set(false);
     this.error.set(false);
+    let outcome: 'ready' | 'error';
     try {
       await this.qr.toCanvas(canvas, text, { width: size });
       this.ready.set(true);
+      outcome = 'ready';
     } catch {
       this.error.set(true);
+      outcome = 'error';
+    }
+    if (!this.destroyed) {
+      this.settled.emit(outcome);
     }
   }
 }

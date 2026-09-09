@@ -6,12 +6,22 @@ import { QrCodeComponent } from './qr-code.component';
 
 @Component({
   imports: [QrCodeComponent],
-  template: `<app-qr-code [text]="text()" [title]="title()" [fileName]="fileName()" [size]="120" />`
+  template: `
+    <app-qr-code
+      [text]="text()"
+      [title]="title()"
+      [fileName]="fileName()"
+      [size]="120"
+      [showDownload]="showDownload()"
+      (settled)="settled.push($event)" />
+  `
 })
 class HostComponent {
   readonly text = signal('https://example.test/a/1');
   readonly title = signal('ABC-1');
   readonly fileName = signal<string | null>(null);
+  readonly showDownload = signal(true);
+  readonly settled: Array<'ready' | 'error'> = [];
   readonly qr = viewChild.required(QrCodeComponent);
 }
 
@@ -122,5 +132,26 @@ describe('QrCodeComponent', () => {
     const host = fixture.nativeElement as HTMLElement;
     expect(host.textContent).toContain('無法產生 QR Code');
     expect(host.querySelector<HTMLButtonElement>('.qr-code__download button')!.disabled).toBeTrue();
+  });
+
+  it('hides the download button when showDownload is false', async () => {
+    fixture.componentInstance.showDownload.set(false);
+    fixture.detectChanges();
+    await settle();
+
+    const host = fixture.nativeElement as HTMLElement;
+    expect(host.querySelector('.qr-code__download')).toBeNull();
+    expect(host.querySelector('canvas.qr-code__canvas')).not.toBeNull();
+  });
+
+  it('emits settled=ready after a successful render and settled=error when encoding fails', async () => {
+    expect(fixture.componentInstance.settled).toEqual(['ready']);
+
+    (qrService.toCanvas as jasmine.Spy).and.rejectWith(new Error('too long'));
+    fixture.componentInstance.text.set('x'.repeat(5000));
+    fixture.detectChanges();
+    await settle();
+
+    expect(fixture.componentInstance.settled).toEqual(['ready', 'error']);
   });
 });

@@ -22,8 +22,9 @@ three lookup tables (`Partner`, `CourseGroup`, `PublishStatus`). It has two pure
 | Default Sort | `DisplayOrder ASC, pkid DESC` |
 
 **Out of scope for this iteration** (mentioned in the reference sample spec but not part of the
-standard `/crud` deliverable): the `POST /copy` action, print-to-PDF, and the
-inline `CourseRelatedLink` / `CourseRecomm` sub-panels. QR-code rendering was added afterwards:
+standard `/crud` deliverable): the `POST /copy` action and the
+inline `CourseRelatedLink` / `CourseRecomm` sub-panels. Print-to-PDF was added afterwards as the
+customer-facing print view (see *Print view* under Frontend Notes). QR-code rendering was added afterwards:
 the detail page's `基本資料` card shows a QR code for
 `https://www.uuu.com.tw/Course/Show/{pkid}/{CourseId}` titled with `CourseId`, with a
 `下載 QR Code` button that saves it as `{CourseId}.png` (title baked into the image). `ClassSection` does not exist in
@@ -369,6 +370,41 @@ Toolbar (title 課程 + `pkid　CourseId Title` + audit badge; 返回／編輯�
 基本資料 (identifiers, FK values as links, dates, numbers, 允許重聽), 課程內容 (eight text
 blocks, `white-space: pre-wrap`, `—` when null), 認證與職務類別 (labels resolved from the
 certification / job-category lookups, joined with `、`), 相關資料 (four link buttons).
+
+### Print view (`features/courses/course-print/`) — 列印PDF
+
+Design record: `docs\designs\course-pdf-export.md` (approved 2026-09-09, wireframe in `docs\designs\assets\`).
+Audience is the **customer** (a sales rep sends the PDF to prospects), so it is not the detail page printed.
+
+- **Entry:** the detail toolbar's 列印PDF button (`pi pi-print`, secondary, outlined, disabled until the record is
+  loaded, between 返回 and 編輯) opens `/course/courses/{pkid}/print` in a new tab via `window.open(url, '_blank')`
+  **without `noopener`** (the session lives in `sessionStorage`, which only auxiliary contexts inherit).
+- **Route:** `:id/print` under `course/courses`, `data: { chromeless: true }`, behind the same `authGuard`. The
+  shell renders only the outlet for chromeless routes (no topbar, sidebar, toast or confirm dialog).
+- **Data:** `GET /api/courses/{id}` then `GET /api/publish-statuses/{publishStatusPkid}`; a failed status lookup
+  after the course loaded counts as unpublished. No certification / job-category lookups. No API change.
+- **Shown:** 課程名稱 (h1), 官方課程名稱 (omitted when empty), 簡介代碼, 科目代碼, 原廠, 課程群組 (omitted when
+  empty); numbers row 時數 / 定價 (`NT$` + `number:'1.0-0'`) / 點數 (`number:'1.1-1'`) / 允許重聽 (是/否); then, in
+  this order, 課程目標, 適合對象, 先備知識, 教材, 課程大綱, 考試／認證說明, 備註, 其他資訊 as heading + `pre-wrap`
+  text. **Empty = null or whitespace-only → the block is omitted** (no dash in a customer document).
+- **Hidden:** 主代碼, 顯示順序, 友善網址, 上架狀態, 上架/下架日期, 認證, 職務類別, 相關資料, 異動紀錄.
+- **QR code:** `QrCodeComponent` (public URL `https://www.uuu.com.tw/Course/Show/{pkid}/{CourseId}`, URL text
+  beneath, download button hidden via `showDownload=false`) **only when `PublishStatus.isPublished`**; the public
+  page does not exist for unpublished courses.
+- **Printing:** `window.print()` is called **once**, after the course has loaded and the QR has settled
+  (`settled` output: `ready` or `error`; on error the figure is hidden) or is not rendered, inside
+  `afterNextRender`. `document.title` = `{CourseId} {Title}` (the browser's default PDF file name). A 列印 button
+  on the screen preview (hidden under `@media print`) re-opens the dialog.
+- **Page:** A4 portrait, 15mm margins, CJK font stack (`Microsoft JhengHei`, `PingFang TC`, `Noto Sans TC`,
+  system-ui). Headings `break-after: avoid-page`; sections `break-inside: avoid-page` except 課程大綱. The browser's
+  default header/footer is replaced by `@page` margin boxes (Chrome/Edge 131+): bottom-left 簡介代碼, bottom-center
+  列印日期 (`toIso(new Date())`), bottom-right 第 n 頁; the values come from `--print-course-id` /
+  `--print-date` custom properties the component sets on `<html>` as quoted CSS strings and clears on destroy.
+- **States:** 載入中…; 404 → 找不到主代碼 {pkid} 的課程 and no print dialog; other error → 無法取得課程資料.
+- **Tests:** `course-print.component.spec.ts` (customer fields only, empty-section omission, QR rule, failed status
+  lookup, title, footer properties, single print after item + QR, QR error, 404 / error, 列印 button, cleanup);
+  `course-detail.component.spec.ts` (button disabled until loaded; `window.open` URL, `_blank`, no third argument);
+  `qr-code.component.spec.ts` (`showDownload`, `settled`); `app.spec.ts` (chromeless route renders only the outlet).
 
 ### Form page (`features/courses/course-form/`)
 

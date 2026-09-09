@@ -205,6 +205,30 @@ describe('CourseDetailComponent', () => {
     expect((fixture.nativeElement as HTMLElement).textContent).toContain('找不到主代碼 99');
   });
 
+  describe('列印PDF', () => {
+    const printButton = (fixture: ComponentFixture<CourseDetailComponent>) =>
+      (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>('.toolbar-print button')!;
+
+    it('is disabled until the record has loaded', async () => {
+      service.getById.and.returnValue(throwError(() => ({ status: 404 })));
+      const fixture = await setup('99');
+
+      expect(printButton(fixture).disabled).toBeTrue();
+    });
+
+    it('opens the print view in a new tab, without noopener, so the session carries over', async () => {
+      const open = spyOn(window, 'open').and.returnValue(null);
+      const fixture = await setup();
+
+      const button = printButton(fixture);
+      expect(button.disabled).toBeFalse();
+      button.click();
+
+      expect(open).toHaveBeenCalledOnceWith('/course/courses/1/print', '_blank');
+      expect(open.calls.mostRecent().args.length).toBe(2);
+    });
+  });
+
   it('asks for confirmation with pkid and courseId before deleting', async () => {
     const fixture = await setup();
     const navigate = spyOn(TestBed.inject(Router), 'navigate').and.resolveTo(true);

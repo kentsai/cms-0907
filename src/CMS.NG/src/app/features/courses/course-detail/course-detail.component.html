@@ -11,6 +11,14 @@
   <ng-template #end>
     <div class="toolbar-actions">
       <p-button label="返回" icon="pi pi-arrow-left" severity="secondary" [outlined]="true" (onClick)="back()" />
+      <p-button
+        class="toolbar-print"
+        label="列印PDF"
+        icon="pi pi-print"
+        severity="secondary"
+        [outlined]="true"
+        [disabled]="!item()"
+        (onClick)="openPrint()" />
       <p-button label="編輯" icon="pi pi-pencil" [disabled]="!item()" (onClick)="edit()" />
       <p-button label="刪除" icon="pi pi-trash" severity="danger" [outlined]="true" [disabled]="!item()" (onClick)="confirmDelete()" />
     </div>

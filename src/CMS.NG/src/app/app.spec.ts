@@ -1,7 +1,8 @@
+import { Component } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { Router, provideRouter } from '@angular/router';
+import { Router, Routes, provideRouter } from '@angular/router';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { ConfirmationService, MessageService } from 'primeng/api';
 import { environment } from '@environments/environment';
@@ -210,6 +211,68 @@ describe('App', () => {
       expect(el.querySelector('.app-sidebar')).toBeNull();
       expect(el.querySelector('.app-shell')?.classList).toContain('app-shell--anonymous');
       expect(el.querySelector('router-outlet')).not.toBeNull();
+    });
+  });
+
+  describe('chromeless routes (data.chromeless, e.g. the course print view)', () => {
+    @Component({ template: '<p class="stub-page">stub page</p>' })
+    class StubPageComponent {}
+
+    const routes: Routes = [
+      { path: 'print', component: StubPageComponent, data: { chromeless: true } },
+      { path: 'normal', component: StubPageComponent }
+    ];
+
+    /** Mounts the shell with real routes so navigation drives the `chromeless` signal. */
+    async function mountWithRoutes(): Promise<ComponentFixture<App>> {
+      await TestBed.configureTestingModule({
+        imports: [App],
+        providers: [
+          provideRouter(routes),
+          provideNoopAnimations(),
+          provideHttpClient(),
+          provideHttpClientTesting(),
+          MessageService,
+          ConfirmationService
+        ]
+      }).compileComponents();
+      const fixture = TestBed.createComponent(App);
+      fixture.detectChanges();
+      return fixture;
+    }
+
+    async function go(fixture: ComponentFixture<App>, url: string): Promise<void> {
+      await TestBed.inject(Router).navigateByUrl(url);
+      fixture.detectChanges();
+    }
+
+    beforeEach(() => seedSignedInUser(['Admin'], '陳小美'));
+
+    it('renders only the routed page: no shell, topbar, sidebar, toast or confirm dialog', async () => {
+      const fixture = await mountWithRoutes();
+      await go(fixture, '/print');
+
+      const el = fixture.nativeElement as HTMLElement;
+      expect(el.querySelector('.stub-page')?.textContent).toBe('stub page');
+      expect(el.querySelector('.app-shell')).toBeNull();
+      expect(el.querySelector('.app-topbar')).toBeNull();
+      expect(el.querySelector('.app-sidebar')).toBeNull();
+      expect(el.querySelector('p-toast')).toBeNull();
+      expect(el.querySelector('p-confirmdialog')).toBeNull();
+    });
+
+    it('restores the shell, toast and confirm dialog on a normal route', async () => {
+      const fixture = await mountWithRoutes();
+      await go(fixture, '/print');
+      await go(fixture, '/normal');
+
+      const el = fixture.nativeElement as HTMLElement;
+      expect(el.querySelector('.stub-page')).not.toBeNull();
+      expect(el.querySelector('.app-shell')).not.toBeNull();
+      expect(el.querySelector('.app-topbar')).not.toBeNull();
+      expect(el.querySelector('.app-sidebar')).not.toBeNull();
+      expect(el.querySelector('p-toast')).not.toBeNull();
+      expect(el.querySelector('p-confirmdialog')).not.toBeNull();
     });
   });
 });

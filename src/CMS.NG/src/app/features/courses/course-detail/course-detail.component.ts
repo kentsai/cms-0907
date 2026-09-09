@@ -78,6 +78,14 @@ export class CourseDetailComponent implements OnInit {
     this.router.navigate(['/course/courses', this.pkid, 'edit']);
   }
 
+  /**
+   * 列印PDF: opens the customer-facing print view in a new tab. Deliberately without `noopener`: the signed-in
+   * profile lives in sessionStorage, which the browser copies only into an auxiliary (opener-linked) context.
+   */
+  protected openPrint(): void {
+    window.open(this.router.serializeUrl(this.router.createUrlTree(['/course/courses', this.pkid, 'print'])), '_blank');
+  }
+
   protected confirmDelete(): void {
     const item = this.item();
     if (!item) {

@@ -3,7 +3,7 @@
 Read this when choosing the next table to scaffold or when touching an existing feature's
 non-obvious behaviour. Specs live in `spec\{sub-system}\{Table}.md`; build with `/crud`.
 
-Totals as of 2026-09-08: **433 xUnit + 406 Karma** tests passing; `ng build` succeeds
+Totals as of 2026-09-09: **451 xUnit + 437 Karma** tests passing; `ng build` succeeds
 (the initial bundle exceeds the 500 kB budget *warning* because of PrimeNG shared chunks —
 not an error). Everything through Login, JWT authorization, My Profile, Change Password
 (with token revocation) and the forced change for default-password logins is on `develop`.
@@ -41,8 +41,8 @@ DisplayOrder column).
 `ScheduleOn + 10y`. The detail page's `基本資料` card shows a **QR code** (`app-qr-code`,
 `core/components/qr-code`) encoding `https://www.uuu.com.tw/Course/Show/{pkid}/{courseId}`
 (`courseShowUrl` in `course.model.ts`), captioned with `courseId`, downloadable as
-`{courseId}.png`. Deliberately **not** built from the sample spec: `/copy`, print-to-PDF,
-CourseRelatedLink / CourseRecomm sub-panels; `ClassSection` is not in the schema.
+`{courseId}.png`. Print-to-PDF is the separate **print view** (see below). Deliberately **not**
+built from the sample spec: `/copy`, CourseRelatedLink / CourseRecomm sub-panels; `ClassSection` is not in the schema.
 The **list page edits cells in place**: double-click (never single-click) opens a PrimeNG
 editor matching the column, blur / Enter / option-select commits, Escape cancels; `主代碼`,
 `原廠`, `課程群組` stay read-only. State, validation (same rules as the form, plus
@@ -188,6 +188,22 @@ Tests: `RowAuditWriterTests` (20), `AuditHelperTests` (+2), `Repositories\Partne
 `RowAuditsControllerTests` (8), `RowAuditRepositoryTests` (6), `RowAuditsEndpointTests` (11, in-memory host) and
 `row-audit-badge.component.spec.ts` (12: inline latest, empty state, dialog trail, dash for null desc, failure
 state, string keys, no pkid, record change).
+
+**Course print view 列印PDF** (branch `feature-course-pdf`, 2026-09-09; design `docs\designs\course-pdf-export.md`,
+spec `spec\course\Course.md` *Print view*) — a customer-facing one-pager, not the detail page printed. The detail
+toolbar's 列印PDF button opens `/course/courses/{pkid}/print` in a new tab (`window.open`, **no `noopener`** so the
+sessionStorage session carries over). The route carries `data: { chromeless: true }`: `app.ts` derives a `chromeless`
+signal from `NavigationEnd` + the leaf route's data and `app.html` then renders nothing around its single
+`<router-outlet>` (no shell grid, topbar, sidebar, toast or confirm dialog), which is what makes multi-page printing work.
+`features/courses/course-print` (`ViewEncapsulation.None`, root class `.course-print`) loads the course, then its
+`PublishStatus` (failure → treated as unpublished), shows the customer field set only (internal fields, 認證, 職務類別,
+相關資料 and the audit badge are absent), omits null / whitespace-only text blocks, renders the QR (`showDownload=false`)
+only for published courses, sets `document.title` to `{courseId} {title}` (default PDF name), writes
+`--print-course-id` / `--print-date` on `<html>` as quoted CSS strings for the `@page` margin-box footer
+(簡介代碼 / 列印日期 / 第 n 頁, Chrome/Edge 131+; cleared on destroy) and calls `window.print()` **once** inside
+`afterNextRender` after the course and the QR have settled. `QrCodeComponent` gained `showDownload` (input) and
+`settled` (`'ready' | 'error'` output). No API change, no new packages. Tests: `course-print.component.spec.ts` (17),
+`course-detail.component.spec.ts` (+2), `qr-code.component.spec.ts` (+2), `app.spec.ts` (+2 chromeless).
 
 ## Lookup endpoints (`/api/lookups/*`)
 

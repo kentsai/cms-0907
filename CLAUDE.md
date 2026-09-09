@@ -27,6 +27,8 @@ cd C:\dev\cms\src\CMS.NG; npx ng test --watch=false --browsers=ChromeHeadless
 - Every API action except `POST /api/auth/login` needs a Bearer JWT (global filter, no role checks);
   `PasswordHash` never crosses the API, and a password change revokes older tokens. A login with the
   default password gets a token that only opens `change-password` (403 elsewhere; SPA route `/change-password`).
+- Chromeless routes: a route with `data: { chromeless: true }` (the course print view
+  `/course/courses/:id/print`) renders only the outlet, no shell / toast / confirm dialog (`app.ts`).
 
 ## Reference notes (read on demand)
 
