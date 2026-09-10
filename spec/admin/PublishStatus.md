@@ -140,7 +140,11 @@ This lookup is consumed by the future `Course` and `Promotion2` features (FK dro
 Notes:
 - `{id:int}` route constraint is used; the controller action parameter is `byte id`
   (a value above 255 fails model binding and returns 400, which is acceptable).
-- Auth: none in this scaffold. No `[Authorize]` attributes.
+- Auth: a Bearer JWT is required on every action by the global `AuthorizeFilter`, and
+  `PublishStatusesController` additionally carries `[Authorize(Policy = AuthorizationPolicies.Admin)]`
+  — a signed-in non-administrator gets 403, mirrored in the SPA by `adminGuard` on
+  `/admin/publish-statuses`. The `/api/lookups/publish-statuses` **lookup** is deliberately exempt and
+  stays open to every signed-in user: it fills the course form's 上架狀態 dropdown.
 
 ---
 

@@ -68,7 +68,9 @@ that is not the API.
   changed; `[AuditIgnore]` properties are skipped).
 - `Infrastructure\EntityInUseException` — repositories throw it on SQL error 547 (FK
   violation); controllers return 409.
-- `Infrastructure\PasswordHasher` (SHA-256 → lowercase hex) and
+- `Infrastructure\PasswordHasher` (salted PBKDF2-HMAC-SHA256, 210,000 iterations, 16-byte salt;
+  `Hash` / `Verify` / `IsLegacyFormat`, and legacy unsalted SHA-256 rows are verified then rewritten in
+  place on the owner's next login) and
   `Infrastructure\AppConfigJson` (reads `defaultPassword` / `symmetricSecurityKey` out of the
   `SysConfig.appConfig` JSON via `ExtractString`; throws `AppConfigException` → controllers
   return 500).

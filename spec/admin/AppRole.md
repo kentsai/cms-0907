@@ -149,7 +149,10 @@ repository.
 | `GET` | `/api/lookups/app-users` | User lookup for the multi-select |
 | `GET` | `/api/lookups/app-roles` | Role lookup |
 
-Auth: none in this scaffold.
+Auth: a Bearer JWT is required on every action by the global `AuthorizeFilter`, and
+`AppRolesController` plus the `/api/lookups/app-roles` lookup additionally carry
+`[Authorize(Policy = AuthorizationPolicies.Admin)]` — a signed-in non-administrator gets 403. The SPA
+mirrors it with `adminGuard` on `/admin/app-roles`.
 
 ---
 

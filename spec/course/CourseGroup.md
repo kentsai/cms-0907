@@ -130,7 +130,8 @@ and `PartnerCourseGroup` features.
 Notes:
 - `{id:int}` route constraint; the controller action parameter is `short id`
   (a value outside the smallint range fails model binding → 400, acceptable).
-- Auth: none in this scaffold. No `[Authorize]` attributes.
+- Auth: a Bearer JWT is required on every action by the global `AuthorizeFilter`. No Admin policy on
+  this feature — every signed-in user may read and write it.
 
 ---
 

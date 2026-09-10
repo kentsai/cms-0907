@@ -179,7 +179,8 @@ gains the matching mock. `lookup.service.ts` needs no change (`certifications()`
 Notes:
 - Same controller shape as `CoursesController` (`[ApiController]`, `[Produces("application/json")]`,
   `ActionResult<T>`, `CancellationToken` on every action).
-- Auth: none in this scaffold.
+- Auth: a Bearer JWT is required on every action by the global `AuthorizeFilter`. No Admin policy on
+  this feature — every signed-in user may read and write it.
 
 ---
 
