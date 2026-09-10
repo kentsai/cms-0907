@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  web.config for the API site (IIS site "CMS.API", physical path C:\VHome\CMS\API).
+
+  `dotnet publish` generates a web.config of its own; deploy.ps1 OVERWRITES it with this one
+  after stamping {{ASPNETCORE_ENVIRONMENT}} and {{CONNECTION_STRING}}. That is the only way to
+  inject the <environmentVariables> block without editing the CMS source tree.
+
+  Requires on the IIS server: the ASP.NET Core 9 Hosting Bundle (AspNetCoreModuleV2).
+-->
+<configuration>
+  <location path="." inheritInChildApplications="false">
+    <system.webServer>
+      <handlers>
+        <add name="aspNetCore" path="*" verb="*" modules="AspNetCoreModuleV2" resourceType="Unspecified" />
+      </handlers>
+
+      <aspNetCore processPath="dotnet"
+                  arguments=".\CMS.API.dll"
+                  stdoutLogEnabled="true"
+                  stdoutLogFile=".\logs\stdout"
+                  hostingModel="inprocess">
+        <environmentVariables>
+          <!-- Stamped from $aspnetEnv in deploy.ps1: "Production".
+               Swagger is Development-only by design (Program.cs registers UseSwagger()/UseSwaggerUI()
+               inside IsDevelopment()), so a deployed site never publishes the API map. Nothing else
+               in this repo keys off the environment: there is no HTTPS redirection and the CORS
+               policy is unconditional. Do not stamp "Development" here to get Swagger back on a
+               server — smoke-test with GET /api/publish-statuses instead (401 without a token). -->
+          <environmentVariable name="ASPNETCORE_ENVIRONMENT" value="{{ASPNETCORE_ENVIRONMENT}}" />
+
+          <!-- The key is CMS, not DefaultConnection — SqlConnectionFactory does
+               configuration.GetConnectionString("CMS"). Double underscore = the ':' separator. -->
+          <environmentVariable name="ConnectionStrings__CMS" value="{{CONNECTION_STRING}}" />
+        </environmentVariables>
+      </aspNetCore>
+
+      <!-- The app sets its own security headers (Infrastructure\SecurityHeadersMiddleware) and Kestrel's Server
+           header is off in Program.cs. These two remove what IIS itself would add on top. -->
+      <httpProtocol>
+        <customHeaders>
+          <remove name="X-Powered-By" />
+        </customHeaders>
+      </httpProtocol>
+      <security>
+        <requestFiltering removeServerHeader="true" />
+      </security>
+    </system.webServer>
+  </location>
+</configuration>

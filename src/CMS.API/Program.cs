@@ -9,6 +9,9 @@ const string LocalhostCorsPolicy = "LocalhostCorsPolicy";
 
 var builder = WebApplication.CreateBuilder(args);
 
+// No "Server: Kestrel" advertisement. (IIS adds its own Server / X-Powered-By headers; deploy\CMS.API\web.config.template removes those.)
+builder.WebHost.ConfigureKestrel(options => options.AddServerHeader = false);
+
 builder.Services.AddControllers(options =>
 {
     // Every action requires an authenticated user; only AuthController opts out with [AllowAnonymous].
@@ -94,8 +97,12 @@ builder.Services.AddScoped<IFeaturedPromoItemRepository, FeaturedPromoItemReposi
 
 var app = builder.Build();
 
-// First in the pipeline so it wraps everything below: any exception no controller mapped is logged in full and
-// answered with 500 + { message, traceId } (see GlobalExceptionMiddleware).
+// Very first, so its OnStarting hook is registered for every request: every response that leaves this process —
+// including the 500 written by the exception middleware below — carries the security headers (see SecurityHeadersMiddleware).
+app.UseMiddleware<SecurityHeadersMiddleware>();
+
+// Wraps everything below: any exception no controller mapped is logged in full and answered with
+// 500 + { message, traceId } (see GlobalExceptionMiddleware).
 app.UseMiddleware<GlobalExceptionMiddleware>();
 
 // Development only. Both are plain middleware, so the global AuthorizeFilter (an MVC action filter) never runs

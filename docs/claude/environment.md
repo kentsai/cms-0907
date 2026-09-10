@@ -59,3 +59,27 @@ and the rarer ones.
 - Download vendor installers directly instead — e.g. VS Code from
   `https://update.code.visualstudio.com/latest/win32-x64-user/stable`, run with
   `/VERYSILENT /SUPPRESSMSGBOXES /NORESTART` (add `/MERGETASKS=...,addtopath`).
+  `deploy\setup-iis.ps1` already follows this rule: it fetches the Hosting Bundle, URL Rewrite and
+  ARR MSIs from download.microsoft.com and runs `msiexec /quiet`, no winget.
+
+## IIS deployment (`deploy\`, runbook `DEPLOY-IIS.md`)
+
+- **IIS is not installed on this box** (as of 2026-09-10: no `W3SVC` service, no `WebAdministration`
+  module, no `C:\VHome`). `setup-iis.ps1` installs it, but that is a Windows-feature change that
+  needs an **elevated** PowerShell, downloads three MSIs, and stops `Default Web Site` to free
+  port 80 — don't run it as a side effect of something else. `deploy.ps1` alone fails without it.
+- The kit's source of truth is the course folder `C:\course\ai-full-stack\demo\iis-deploy\`
+  (`copy-to-project.ps1 -ProjectRoot C:\dev\cms` re-copies it). The repo copy has been corrected
+  where the kit described a `Program.cs` this project does not have (there is no
+  `UseHttpsRedirection` / `UseHsts`, and CORS is unconditional); prefer the repo copy.
+- `deploy.ps1` hardcodes `$ProjectRoot = "C:\dev\cms"` and a connection string with
+  `Encrypt=True` (appsettings.json says `Encrypt=False`); the stamped `ConnectionStrings__CMS`
+  environment variable wins over appsettings at runtime, and SQLEXPRESS accepts it because
+  `TrustServerCertificate=True` is set. Edit the CONFIG block in **both** scripts together.
+- `$aspnetEnv = "Production"`, so the deployed API has **no** `/swagger` (it is gated on
+  `IsDevelopment()` in `Program.cs`, and that is deliberate). Smoke-test the API site with
+  `GET http://<host>:5001/api/publish-statuses` — 401 without a token means it is up. The kit's
+  course-folder original stamps `Development` to keep Swagger as a demo prop; the repo copy does not.
+- To probe a freshly published API without IIS, run the DLL directly with `--contentRoot`
+  pointing at `src\CMS.API`; without it `appsettings.json` is not found and every request
+  500s with "Connection string 'CMS' is not configured", which looks like a code bug and is not.

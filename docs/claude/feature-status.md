@@ -3,7 +3,7 @@
 Read this when choosing the next table to scaffold or when touching an existing feature's
 non-obvious behaviour. Specs live in `spec\{sub-system}\{Table}.md`; build with `/crud`.
 
-Totals as of 2026-09-10: **500 xUnit + 443 Karma** tests passing; `ng build` succeeds
+Totals as of 2026-09-10: **512 xUnit + 443 Karma** tests passing; `ng build` succeeds
 (the initial bundle exceeds the 500 kB budget *warning* because of PrimeNG shared chunks —
 not an error). Everything through Login, JWT authorization, My Profile, Change Password
 (with token revocation) and the forced change for default-password logins is on `develop`.
@@ -238,6 +238,35 @@ must-change-password admin still 403, plus reflection tests pinning the guarded 
 Also fixed a pre-existing Karma flake: `auth.interceptor.spec.ts` verified an HTTP backend in `afterEach`
 that its two pure `serverErrorDetail` specs never created, so the suite failed whenever Jasmine's random
 order ran them first.
+
+**Security headers** (2026-09-10) — `Infrastructure\SecurityHeadersMiddleware` is registered **first** in
+`Program.cs` and hooks `Response.OnStarting`, so every response the API produces carries `nosniff`,
+`X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, `Cache-Control: no-store` and
+`Content-Security-Policy: default-src 'none'; frame-ancestors 'none'` — 200s, the bearer 401, the admin-policy
+403 and the exception middleware's 500 alike. `/swagger` requests get a looser CSP (inline script/style) so
+Swashbuckle's UI still runs, and are not `no-store`. HSTS is emitted only on HTTPS requests. Headers are set
+only when absent, so `GlobalExceptionMiddleware`'s own `Cache-Control` survives. Kestrel's `Server` header is
+off. The SPA's equivalent set lives in `deploy\CMS.NG\web.config.template` (adds `Permissions-Policy`, removes
+IIS's `Server` / `X-Powered-By`, HSTS as an outbound rule conditional on `{HTTPS}`). Its
+`script-src 'self'` forced one build change: `angular.json` now sets
+`optimization.styles.inlineCritical: false`, because the critical-CSS inliner emits an inline `onload=` the
+policy blocks — leave it off. Tests: `Infrastructure\SecurityHeadersTests` (12). Verified in a real Chrome
+against the production bundle behind a stand-in for the IIS site: login, course list, detail QR canvas, the
+chromeless print view, the admin page and the Swagger UI all render with **zero** CSP violations.
+
+**IIS deployment kit** (`deploy\` + `DEPLOY-IIS.md`, 2026-09-10; copied from
+`C:\course\ai-full-stack\demo\iis-deploy` by its `copy-to-project.ps1`) — `setup-iis.ps1` (once, elevated)
+and `deploy.ps1` (every time) publish the API and build the SPA, stamp both `web.config`s from templates,
+cycle `CMS.API.Pool`, and copy to `C:\VHome\CMS\{API,NG}`; sites `CMS` (:80) and `CMS.API` (:5001), with
+`/api/*` reverse-proxied by URL Rewrite + ARR so the SPA is same-origin. The one source change it required:
+production `environment.ts` now has `apiBaseUrl: '/api'` (was the dev placeholder `http://localhost:5000/api`,
+which would have sent the deployed SPA past the proxy to a port nothing listens on); `environment.development.ts`
+is unchanged, so `ng serve` and every Karma spec (they build URLs from `environment.apiBaseUrl` symbolically)
+are unaffected. The kit's original stamps `ASPNETCORE_ENVIRONMENT=Development` to keep Swagger as a demo
+prop; the repo copy stamps **`Production`**, so a deployed API never serves `/swagger` (Development-only by
+design) and both scripts print `GET /api/publish-statuses` (401 = up) as the smoke test instead. Not yet
+exercised end-to-end on this machine — IIS is not installed here (see `environment.md`). Details:
+`feature-infrastructure.md` (layout) and `DEPLOY-IIS.md` (runbook).
 
 ## Lookup endpoints (`/api/lookups/*`)
 

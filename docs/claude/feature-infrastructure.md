@@ -8,13 +8,34 @@ Overview and always-on conventions are in `CLAUDE.md`.
 ```
 database\        *.sql schema files (source of truth for the data model)
 spec\            code-gen.convention.md, feature specs in spec\{sub-system}\{Table}.md
+plans\           approved implementation plans, YYYY-MM-DD-<feature>.md
 docs\claude\     reference notes for Claude (this folder)
+DEPLOY-IIS.md    IIS runbook (topology, one-time setup, troubleshooting)
+deploy\          IIS deployment kit — see below
+  setup-iis.ps1  one-time, elevated: IIS role, Hosting Bundle, URL Rewrite, ARR (+ server proxy flag),
+                 C:\VHome\CMS\{API,NG}, pools CMS.API.Pool / CMS.NG.Pool, sites CMS(:80) / CMS.API(:5001),
+                 -GrantSqlAccess = SQL login for IIS APPPOOL\CMS.API.Pool. Idempotent.
+  deploy.ps1     every time: dotnet publish -c Release + npm run build, stamp both web.configs,
+                 stop pool -> clear -> copy -> start pool (API), clear -> copy (NG). CONFIG block at the top.
+  CMS.API\web.config.template   AspNetCoreModuleV2 + <environmentVariables>: {{ASPNETCORE_ENVIRONMENT}},
+                                {{CONNECTION_STRING}} -> ConnectionStrings__CMS
+  CMS.NG\web.config.template    URL Rewrite: ^api/(.*) -> {{API_ORIGIN}}/api/{R:1} (ARR proxy), SPA fallback
+                                to /index.html, index.html no-cache, hashed bundles cached a year
+  publish\       dotnet publish output (gitignored via deploy\.gitignore)
 src\
   global.json    pins the SDK to 9.0.317
   CMS.API\       .NET 9 Web API, controllers + Dapper
   CMS.API.Tests\ xUnit + Moq
   CMS.NG\        Angular 20, standalone components, PrimeNG (Aura)
+    src\environments\environment.ts              production: apiBaseUrl '/api' (same-origin behind the proxy)
+    src\environments\environment.development.ts  ng serve:   apiBaseUrl 'http://localhost:5000/api'
 ```
+
+Nothing in `src\` references `deploy\`; the kit works entirely from the build outputs
+(`deploy\publish\API` and `src\CMS.NG\dist\CMS.NG\browser`) and writes both `web.config`s into them
+right before copying. The one thing the app itself must get right for the kit is the production
+`apiBaseUrl` above — with an absolute URL the deployed SPA would bypass the proxy and call a port
+that is not the API.
 
 ## Backend (`src\CMS.API`)
 
@@ -124,7 +145,36 @@ src\
 - `Program.cs` ends with `public partial class Program;` so tests can reference it.
 - CORS policy `LocalhostCorsPolicy` allows any loopback origin (`uri.IsLoopback`).
 - Swagger: **Swashbuckle 7.2.0**, pinned. `Microsoft.AspNetCore.OpenApi` / `AddOpenApi`
-  was deliberately removed — don't reintroduce it. Swagger UI is on in all environments.
+  was deliberately removed — don't reintroduce it. Swagger UI is **Development-only** (`if (app.Environment.IsDevelopment())` in `Program.cs`, since the 2026-09-10 security fix); `deploy.ps1` stamps `Production`, so a deployed site never serves it.
+
+## Security headers
+
+Two sets, because two servers answer: Kestrel/ANCM serves `/api`, IIS serves the SPA's static files.
+
+- **API** — `Infrastructure\SecurityHeadersMiddleware`, registered **first** in `Program.cs` so its
+  `Response.OnStarting` hook is in place before anything can short-circuit. Every response gets
+  `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer` and
+  `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'` (the API returns only JSON, so it needs
+  to load nothing), plus `Cache-Control: no-store` — login responses carry the token, and every other response
+  is bearer-protected. `Strict-Transport-Security` is added **only when `Request.IsHttps`**: browsers ignore it
+  on plain HTTP and emitting it there would just mislead. Requests under `/swagger` get a looser policy
+  (`script-src`/`style-src 'self' 'unsafe-inline'`, `img-src 'self' data:`) because Swashbuckle's UI is inline,
+  and are not marked `no-store`. Every header is set **only if absent**, so an action may opt out by setting its
+  own first — `GlobalExceptionMiddleware` already sets `Cache-Control` and keeps it. `Program.cs` also turns off
+  Kestrel's `Server` header.
+- **SPA** — `deploy\CMS.NG\web.config.template` `<httpProtocol><customHeaders>`: the same four plus
+  `Permissions-Policy`, with a CSP matched to what the bundle really does — `script-src 'self'` (no inline),
+  `style-src 'self' 'unsafe-inline'` (Angular emulated encapsulation and the PrimeNG theme inject `<style>` at
+  runtime; a nonce would need a server rendering `index.html` per request, which a static site is not),
+  `img-src 'self' data:` (the QR `<canvas>`), `connect-src 'self'` (the API is same-origin behind the proxy).
+  `removeServerHeader` and a `remove` of `X-Powered-By` drop IIS's own advertisements; HSTS is an
+  **outbound rule** conditional on `{HTTPS} = on`, so it stays inert until an HTTPS binding exists.
+  Proxied `/api` responses keep the API's headers — `customHeaders` only applies to what IIS itself serves.
+
+`script-src 'self'` is why `angular.json` sets `optimization.styles.inlineCritical: false`: the critical-CSS
+inliner rewrites the stylesheet link to `media="print" onload="this.media='all'"`, and that inline handler is
+exactly what the policy forbids. Turning it back on ships a page whose CSS never loads. Verified in a real
+browser (login, list, detail QR, print view, admin page, Swagger) with zero violations.
 - No `UseHttpsRedirection`; HTTP-only on port 5000 by design.
 
 ## Frontend (`src\CMS.NG\src\app`)
