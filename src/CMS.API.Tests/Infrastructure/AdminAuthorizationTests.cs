@@ -27,8 +27,15 @@ public class AdminAuthorizationTests
     private const string ResetPasswordUrl = "/api/app-users/victim/reset-password";
     private const string AppUsersLookupUrl = "/api/lookups/app-users";
     private const string AppRolesLookupUrl = "/api/lookups/app-roles";
-    /// <summary>A content endpoint: authenticated is enough, no role needed.</summary>
-    private const string ContentUrl = "/api/publish-statuses";
+    /// <summary>
+    /// A content endpoint: authenticated is enough, no role needed. The publish-status <b>lookup</b>, not
+    /// <c>/api/publish-statuses</c> — the CRUD controller behind that route is administrators-only, while this
+    /// lookup has to stay open or the course form's 上架狀態 dropdown empties for the editors who use it.
+    /// </summary>
+    private const string ContentUrl = "/api/lookups/publish-statuses";
+
+    /// <summary>The publish-status CRUD surface, administrators-only alongside the account / role endpoints.</summary>
+    private const string PublishStatusesUrl = "/api/publish-statuses";
 
     private static HttpClient ClientWithToken(CmsApiFactory factory, string token)
     {
@@ -58,6 +65,11 @@ public class AdminAuthorizationTests
         var roles = new Mock<IAppRoleRepository>();
         roles.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync([]);
         roles.Setup(r => r.GetLookupAsync(It.IsAny<CancellationToken>())).ReturnsAsync([]);
+
+        // Backs ContentUrl: the one publish-status route a non-administrator must keep.
+        factory.PublishStatusRepository
+            .Setup(r => r.GetLookupAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
 
         factory.AppUserRepository = users;
         factory.AppRoleRepository = roles;
@@ -177,6 +189,69 @@ public class AdminAuthorizationTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
+    // ---- Regression: ISSUE-004 — the publish-status vocabulary is administrators-only ----
+    // Found by /qa on 2026-09-10
+    // Report: .gstack/qa-reports/qa-report-localhost-2026-09-10.md
+    //
+    // The 系統管理 Admin menu group has always hidden 發布狀態 from non-administrators, but the controller
+    // behind it carried no policy: a signed-in editor who pasted /admin/publish-statuses could list, add and
+    // delete the publish states every course's 上架狀態 points at. The menu was the only thing in the way.
+
+    [Fact]
+    public async Task Editor_CannotListPublishStatuses()
+    {
+        using var factory = FactoryWithAdminRepositories();
+
+        var response = await EditorClient(factory).GetAsync(PublishStatusesUrl);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Editor_CannotCreateAPublishStatus()
+    {
+        using var factory = FactoryWithAdminRepositories();
+
+        var response = await EditorClient(factory)
+            .PostAsJsonAsync(PublishStatusesUrl, new PublishStatusRequest { Description = "偷加的狀態" });
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        factory.PublishStatusRepository.Verify(
+            r => r.CreateAsync(It.IsAny<PublishStatusRequest>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Editor_CannotDeleteAPublishStatus()
+    {
+        using var factory = FactoryWithAdminRepositories();
+
+        var response = await EditorClient(factory).DeleteAsync($"{PublishStatusesUrl}/1");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        factory.PublishStatusRepository.Verify(
+            r => r.DeleteAsync(It.IsAny<byte>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Admin_KeepsFullAccessToPublishStatuses()
+    {
+        using var factory = FactoryWithAdminRepositories();
+
+        var response = await AdminClient(factory).GetAsync(PublishStatusesUrl);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task NoToken_IsStill401_NotForbidden_OnPublishStatuses()
+    {
+        using var factory = FactoryWithAdminRepositories();
+
+        var response = await factory.CreateClient().GetAsync(PublishStatusesUrl);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
     [Fact]
     public async Task NoToken_IsStill401_NotForbidden_OnAnAdminEndpoint()
     {
@@ -225,7 +300,9 @@ public class AdminAuthorizationTests
             .OrderBy(name => name)
             .ToList();
 
-        Assert.Equal([nameof(AppRolesController), nameof(AppUsersController)], guarded);
+        Assert.Equal(
+            [nameof(AppRolesController), nameof(AppUsersController), nameof(PublishStatusesController)],
+            guarded);
     }
 
     [Fact]
