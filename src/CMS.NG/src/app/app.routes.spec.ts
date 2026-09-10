@@ -59,4 +59,37 @@ describe('app routes', () => {
 
     expect(guarded.sort()).toEqual([...ADMIN_ONLY_PATHS].sort());
   });
+
+  /**
+   * Regression: ISSUE-006 — an unmatched URL left the router outlet empty
+   * Found by /qa on 2026-09-10
+   * Report: .gstack/qa-reports/qa-report-localhost-2026-09-10-r2.md
+   *
+   * Without a `**` route Angular threw NG04002 and rendered the shell around a blank page. The
+   * wildcard must stay INSIDE the authGuard group and LAST: outside it an unmatched URL would skip
+   * the sign-in redirect, and anywhere but last it would swallow the routes declared after it.
+   */
+  describe('unmatched URLs (ISSUE-006)', () => {
+    it('declares a ** wildcard that redirects home', () => {
+      const wildcard = featureRoutes.find(route => route.path === '**');
+
+      expect(wildcard).toBeDefined();
+      expect(wildcard!.redirectTo).toBe('home/featured-promo-items');
+    });
+
+    it('keeps the wildcard inside the authGuard group so signed-out users still reach /login', () => {
+      expect(routes.some(route => route.path === '**')).toBeFalse();
+      expect(signedInGroup.canActivateChild).toContain(authGuard);
+    });
+
+    it('keeps the wildcard last so it cannot swallow a real route', () => {
+      expect(featureRoutes[featureRoutes.length - 1].path).toBe('**');
+    });
+
+    it('redirects to a path that is itself a declared route', () => {
+      const target = featureRoutes.find(route => route.path === '**')!.redirectTo;
+
+      expect(featureRoutes.some(route => route.path === target)).toBeTrue();
+    });
+  });
 });
