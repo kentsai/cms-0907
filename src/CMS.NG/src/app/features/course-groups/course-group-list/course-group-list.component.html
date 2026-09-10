@@ -67,9 +67,9 @@
               [queryParams]="{ courseGroupPkid: item.pkid }" />
           </td>
           <td class="col-actions">
-            <p-button icon="pi pi-eye" [text]="true" [rounded]="true" size="small" pTooltip="檢視" tooltipPosition="top" (onClick)="view(item)" />
-            <p-button icon="pi pi-pencil" [text]="true" [rounded]="true" size="small" pTooltip="編輯" tooltipPosition="top" (onClick)="edit(item)" />
-            <p-button icon="pi pi-trash" [text]="true" [rounded]="true" size="small" severity="danger" pTooltip="刪除" tooltipPosition="top" (onClick)="confirmDelete(item)" />
+            <p-button icon="pi pi-eye" [text]="true" [rounded]="true" size="small" ariaLabel="檢視" pTooltip="檢視" tooltipPosition="top" (onClick)="view(item)" />
+            <p-button icon="pi pi-pencil" [text]="true" [rounded]="true" size="small" ariaLabel="編輯" pTooltip="編輯" tooltipPosition="top" (onClick)="edit(item)" />
+            <p-button icon="pi pi-trash" [text]="true" [rounded]="true" size="small" severity="danger" ariaLabel="刪除" pTooltip="刪除" tooltipPosition="top" (onClick)="confirmDelete(item)" />
           </td>
         </tr>
       </ng-template>

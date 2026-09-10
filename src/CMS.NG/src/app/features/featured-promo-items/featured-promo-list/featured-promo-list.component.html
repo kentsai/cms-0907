@@ -59,11 +59,11 @@
             <div class="row row--filled">
               <span class="row__slot">{{ cell.slot }}</span>
               <span class="row__actions">
-                <p-button icon="pi pi-arrow-up" [text]="true" [rounded]="true" size="small" pTooltip="上移" tooltipPosition="top" [disabled]="cell.slot <= minSlot" (onClick)="moveUp(item)" />
-                <p-button icon="pi pi-arrow-down" [text]="true" [rounded]="true" size="small" pTooltip="下移" tooltipPosition="top" [disabled]="cell.slot >= maxSlot" (onClick)="moveDown(item)" />
-                <p-button icon="pi pi-pencil" [text]="true" [rounded]="true" size="small" pTooltip="編輯" tooltipPosition="top" (onClick)="startEdit(day, cell)" />
-                <p-button icon="pi pi-copy" [text]="true" [rounded]="true" size="small" pTooltip="複製" tooltipPosition="top" (onClick)="copy(item)" />
-                <p-button icon="pi pi-trash" [text]="true" [rounded]="true" size="small" severity="danger" pTooltip="刪除" tooltipPosition="top" (onClick)="confirmDelete(item)" />
+                <p-button icon="pi pi-arrow-up" [text]="true" [rounded]="true" size="small" ariaLabel="上移" pTooltip="上移" tooltipPosition="top" [disabled]="cell.slot <= minSlot" (onClick)="moveUp(item)" />
+                <p-button icon="pi pi-arrow-down" [text]="true" [rounded]="true" size="small" ariaLabel="下移" pTooltip="下移" tooltipPosition="top" [disabled]="cell.slot >= maxSlot" (onClick)="moveDown(item)" />
+                <p-button icon="pi pi-pencil" [text]="true" [rounded]="true" size="small" ariaLabel="編輯" pTooltip="編輯" tooltipPosition="top" (onClick)="startEdit(day, cell)" />
+                <p-button icon="pi pi-copy" [text]="true" [rounded]="true" size="small" ariaLabel="複製" pTooltip="複製" tooltipPosition="top" (onClick)="copy(item)" />
+                <p-button icon="pi pi-trash" [text]="true" [rounded]="true" size="small" severity="danger" ariaLabel="刪除" pTooltip="刪除" tooltipPosition="top" (onClick)="confirmDelete(item)" />
               </span>
               <span class="row__cell row__code"><code>{{ item.promoCode }}</code></span>
               <span class="row__cell row__topic">{{ item.topic }}</span>
@@ -73,8 +73,8 @@
             <div class="row row--empty">
               <span class="row__slot">{{ cell.slot }}</span>
               <span class="row__actions">
-                <p-button icon="pi pi-plus" [text]="true" [rounded]="true" size="small" pTooltip="新增" tooltipPosition="top" [disabled]="selectedCenter() === null" (onClick)="startEdit(day, cell)" />
-                <p-button icon="pi pi-clipboard" [text]="true" [rounded]="true" size="small" pTooltip="貼上" tooltipPosition="top" [disabled]="!clipboard() || selectedCenter() === null" (onClick)="paste(day, cell)" />
+                <p-button icon="pi pi-plus" [text]="true" [rounded]="true" size="small" ariaLabel="新增" pTooltip="新增" tooltipPosition="top" [disabled]="selectedCenter() === null" (onClick)="startEdit(day, cell)" />
+                <p-button icon="pi pi-clipboard" [text]="true" [rounded]="true" size="small" ariaLabel="貼上" pTooltip="貼上" tooltipPosition="top" [disabled]="!clipboard() || selectedCenter() === null" (onClick)="paste(day, cell)" />
               </span>
               <span class="row__cell row__code muted">—</span>
               <span class="row__cell row__topic muted"></span>
