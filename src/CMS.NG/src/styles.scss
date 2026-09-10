@@ -78,3 +78,26 @@ body {
   color: var(--p-red-500);
   font-size: 0.8125rem;
 }
+
+/* List tables, shared by all eight list pages (each wraps its table in `.page-body { overflow-x: auto }`).
+   The two rules only make sense together.
+
+   `th` must never wrap: Chinese breaks between any two characters, and under `table-layout: auto` the
+   only columns without their own `white-space: nowrap` (`.col-pkid`, `.col-order`) were the ones the
+   browser compressed when the table outgrew its container — down to 28px, which stacked every heading
+   one glyph per line and made a 111px header row label a 47px data row. Single-line headings: 26px.
+
+   Single-line headings make the table wider than the viewport, so `.col-actions` then sticks to the
+   right edge: 檢視 / 編輯 / 刪除 are the most-used controls on these pages and must never scroll out of
+   reach. `background: inherit` takes the row's own background, so the cell stays opaque over the
+   scrolling content and still follows the row (`.editing`, striping, any future hover tint). */
+.p-datatable th {
+  white-space: nowrap;
+}
+
+.col-actions {
+  position: sticky;
+  right: 0;
+  background: inherit;
+  box-shadow: -6px 0 6px -6px rgb(0 0 0 / 25%);
+}
