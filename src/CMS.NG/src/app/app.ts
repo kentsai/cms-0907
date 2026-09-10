@@ -116,9 +116,14 @@ export class App {
     ),
     { initialValue: isChromelessRoute(this.router) }
   );
-  /** Starts collapsed on narrow viewports (phones), where the sidebar is an overlay rather than a column. */
+  /**
+   * Starts collapsed on narrow viewports (phones and tablets), where the sidebar is an overlay rather than
+   * a column. The 1023px here must stay in step with the matching media query in `app.scss` — below that
+   * width the stylesheet takes the sidebar out of the grid, so a session that started expanded would open
+   * as an overlay covering the page.
+   */
   protected readonly sidebarCollapsed = signal(
-    typeof window !== 'undefined' && window.matchMedia?.('(max-width: 640px)').matches === true
+    typeof window !== 'undefined' && window.matchMedia?.('(max-width: 1023px)').matches === true
   );
 
   /** The full menu for Admins; everyone else gets it without the `系統管理 Admin` group. */

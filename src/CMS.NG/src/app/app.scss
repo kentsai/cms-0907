@@ -104,9 +104,14 @@
   border: none;
 }
 
-// Narrow viewports (phones): the content takes the full width and the sidebar, when open, floats over it
-// instead of squeezing the page into a sliver. The shell starts collapsed there (see `App.sidebarCollapsed`).
-@media (max-width: 640px) {
+// Narrow viewports (phones AND tablets, up to 1023px): the content takes the full width and the sidebar,
+// when open, floats over it instead of squeezing the page into a sliver. The shell starts collapsed there
+// (see `App.sidebarCollapsed`, which must keep the same 1023px value as this query).
+//
+// 1023px, not 640px: below 1024 the fixed 260px column left an iPad portrait (768px) only 508px of content,
+// which crushed the list header onto four lines and collapsed the 課程名稱 column to a ~10px sliver.
+// Collapsing at 1024 gives that viewport 728px instead of 468px.
+@media (max-width: 1023px) {
   .app-shell:not(.app-shell--anonymous):not(.app-shell--locked) {
     grid-template-columns: 1fr;
     grid-template-areas:

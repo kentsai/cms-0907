@@ -103,13 +103,21 @@ describe('App', () => {
     it('should toggle the sidebar collapsed state', async () => {
       const fixture = await mount();
 
-      const shell = (fixture.nativeElement as HTMLElement).querySelector('.app-shell')!;
-      expect(shell.classList).not.toContain('app-shell--collapsed');
+      const el = fixture.nativeElement as HTMLElement;
+      const shell = el.querySelector('.app-shell')!;
+      const toggle = el.querySelector<HTMLButtonElement>('.app-topbar__toggle')!;
+      // The starting state is viewport-dependent (`App.sidebarCollapsed` seeds itself from
+      // `matchMedia('(max-width: 1023px)')`, and the Karma browser window is narrower than that), so assert
+      // the flip rather than an absolute state — the flip is what the toggle is actually responsible for.
+      const startedCollapsed = shell.classList.contains('app-shell--collapsed');
 
-      (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>('.app-topbar__toggle')!.click();
+      toggle.click();
       fixture.detectChanges();
+      expect(shell.classList.contains('app-shell--collapsed')).toBe(!startedCollapsed);
 
-      expect(shell.classList).toContain('app-shell--collapsed');
+      toggle.click();
+      fixture.detectChanges();
+      expect(shell.classList.contains('app-shell--collapsed')).toBe(startedCollapsed);
     });
 
     it('links the user name to the My Profile page', async () => {
