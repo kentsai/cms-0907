@@ -27,15 +27,24 @@ body {
   font-weight: 600;
 }
 
-/* Detail / edit toolbars (`.toolbar-title` + `.toolbar-actions`, shared by every feature page) on phones:
-   let the title row wrap instead of shrinking the heading to one character per line and overflowing sideways. */
+/* Detail / edit toolbars (`.toolbar-title` + `.toolbar-actions`, shared by every feature page) and the
+   list-page header (`.page-header`, the same flex row one card up) on phones: let the title row wrap
+   instead of shrinking the heading to one character per line and overflowing sideways. The `.page-header`
+   rules stay global because every list component re-declares `.page-header` in its own scoped stylesheet
+   and none of them sets `flex-wrap`, and because the button label lives inside PrimeNG's own template,
+   out of reach of the host component's emulated encapsulation. */
 @media (max-width: 640px) {
   .toolbar-title,
-  .toolbar-actions {
+  .toolbar-actions,
+  .page-header,
+  .page-header__title,
+  .page-header__actions {
     flex-wrap: wrap;
   }
 
-  .toolbar-title h1 {
+  .toolbar-title h1,
+  .page-header__title h1,
+  .page-header__actions .p-button-label {
     white-space: nowrap;
   }
 }
