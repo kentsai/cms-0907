@@ -107,7 +107,7 @@ export class App {
   protected readonly auth = inject(AuthService);
   private readonly router = inject(Router);
 
-  protected readonly title = signal('CMS-React');
+  protected readonly title = signal('CMS');
   /** True while the active leaf route is chromeless (see {@link CHROMELESS_ROUTE_DATA}); re-evaluated on every navigation. */
   protected readonly chromeless = toSignal(
     this.router.events.pipe(
