@@ -6,12 +6,20 @@ using Microsoft.Data.SqlClient;
 
 namespace CMS.API.Repositories;
 
-public sealed class AppUserRepository(IDbConnectionFactory connectionFactory, IRowAuditWriter auditWriter)
+public sealed class AppUserRepository(
+    IDbConnectionFactory connectionFactory, IRowAuditWriter auditWriter, TimeProvider timeProvider)
     : IAppUserRepository
 {
     private const string TableName = "AppUser";
     private const int SqlForeignKeyViolation = 547;
-    private const string PasswordResetAuditDesc = "PasswordHash (reset to default)";
+
+    /// <summary>
+    /// Deliberately says only that the password column changed, never that it was reset to the system
+    /// default. <c>RowAudit</c> is readable through the 異動紀錄 badge, and naming the default made the
+    /// trail a list of accounts currently standing on the shared <c>SysConfig.appConfig.defaultPassword</c>
+    /// — a login anyone could then complete. Same wording a normal password change produces.
+    /// </summary>
+    private const string PasswordResetAuditDesc = "PasswordHash";
 
     // PasswordHash is never selected.
     private const string SelectColumns = """
@@ -70,7 +78,7 @@ public sealed class AppUserRepository(IDbConnectionFactory connectionFactory, IR
     {
         const string sql = """
             INSERT INTO AppUser (UserId, UserName, IsActive, PasswordHash, PasswordUpdatedTime)
-            VALUES (@UserId, @UserName, @IsActive, @PasswordHash, GETUTCDATE());
+            VALUES (@UserId, @UserName, @IsActive, @PasswordHash, @PasswordUpdatedTime);
             SELECT CAST(SCOPE_IDENTITY() AS int);
             """;
 
@@ -79,10 +87,25 @@ public sealed class AppUserRepository(IDbConnectionFactory connectionFactory, IR
 
         var scalars = ScalarParameters(request);
         var passwordHash = await GetDefaultPasswordHashAsync(connection, transaction, cancellationToken);
-        var parameters = new { scalars.UserId, scalars.UserName, scalars.IsActive, PasswordHash = passwordHash };
+        var parameters = new
+        {
+            scalars.UserId,
+            scalars.UserName,
+            scalars.IsActive,
+            PasswordHash = passwordHash,
+            PasswordUpdatedTime = timeProvider.GetUtcNow().UtcDateTime
+        };
 
-        var pkid = await connection.ExecuteScalarAsync<int>(
-            new CommandDefinition(sql, parameters, transaction, cancellationToken: cancellationToken));
+        int pkid;
+        try
+        {
+            pkid = await connection.ExecuteScalarAsync<int>(
+                new CommandDefinition(sql, parameters, transaction, cancellationToken: cancellationToken));
+        }
+        catch (SqlException ex) when (SqlErrorNumbers.IsUniqueViolation(ex.Number))
+        {
+            throw new DuplicateKeyException($"帳號「{scalars.UserId}」已存在。");
+        }
 
         await SyncRolesAsync(connection, transaction, scalars.UserId, request.RoleIds, cancellationToken);
 
@@ -160,10 +183,14 @@ public sealed class AppUserRepository(IDbConnectionFactory connectionFactory, IR
 
     public async Task<bool> ResetPasswordAsync(string userId, CancellationToken cancellationToken)
     {
+        // PasswordUpdatedTime is the token-revocation stamp: the bearer handler rejects any token whose
+        // `iat` predates it. `iat` comes from the injected TimeProvider (JwtTokenIssuer), so this column
+        // must come from the same clock. GETUTCDATE() is SQL Server's clock, and if that trailed the web
+        // server's by even a second the comparison went the wrong way and an admin's reset revoked nothing.
         const string sql = """
             UPDATE AppUser
             SET PasswordHash = @PasswordHash,
-                PasswordUpdatedTime = GETUTCDATE()
+                PasswordUpdatedTime = @PasswordUpdatedTime
             WHERE UserId = @UserId;
             """;
 
@@ -178,7 +205,10 @@ public sealed class AppUserRepository(IDbConnectionFactory connectionFactory, IR
 
         var passwordHash = await GetDefaultPasswordHashAsync(connection, transaction, cancellationToken);
         await connection.ExecuteAsync(new CommandDefinition(
-            sql, new { UserId = userId, PasswordHash = passwordHash }, transaction, cancellationToken: cancellationToken));
+            sql,
+            new { UserId = userId, PasswordHash = passwordHash, PasswordUpdatedTime = timeProvider.GetUtcNow().UtcDateTime },
+            transaction,
+            cancellationToken: cancellationToken));
 
         await auditWriter.WriteAsync(connection, TableName, userId, RowAuditWriter.Update,
             PasswordResetAuditDesc, cancellationToken, transaction);

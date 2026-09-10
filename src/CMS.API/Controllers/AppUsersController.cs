@@ -20,7 +20,7 @@ namespace CMS.API.Controllers;
 [Authorize(Policy = AuthorizationPolicies.Admin)]
 [Route("api/app-users")]
 [Produces("application/json")]
-public class AppUsersController(IAppUserRepository repository) : ControllerBase
+public class AppUsersController(IAppUserRepository repository, IPasswordStampCache passwordStamps) : ControllerBase
 {
     private const string AppConfigErrorTitle = "系統設定錯誤";
 
@@ -64,6 +64,12 @@ public class AppUsersController(IAppUserRepository repository) : ControllerBase
         try
         {
             pkid = await repository.CreateAsync(request, cancellationToken);
+        }
+        catch (DuplicateKeyException ex)
+        {
+            // The ExistsAsync check above is a read followed by a write, so a concurrent create with the
+            // same key slips past it and loses on the primary key instead. Same 409 either way.
+            return Conflict(new { message = ex.Message });
         }
         catch (AppConfigException ex)
         {
@@ -122,7 +128,17 @@ public class AppUsersController(IAppUserRepository repository) : ControllerBase
         try
         {
             var reset = await repository.ResetPasswordAsync(id, cancellationToken);
-            return reset ? NoContent() : NotFound();
+            if (!reset)
+            {
+                return NotFound();
+            }
+
+            // Same reason as AuthController.ChangePassword: the bearer handler caches PasswordUpdatedTime
+            // per user, so without this the target's existing token keeps working for up to
+            // PasswordStampCache.CacheDuration. This reset is the one lever an admin has to end a
+            // hijacked session, so it has to take effect on the very next request.
+            passwordStamps.Invalidate(id);
+            return NoContent();
         }
         catch (AppConfigException ex)
         {

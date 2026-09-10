@@ -75,8 +75,16 @@ public sealed class AppRoleRepository(IDbConnectionFactory connectionFactory, IR
         await using var connection = await connectionFactory.CreateOpenConnectionAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
 
-        var pkid = await connection.ExecuteScalarAsync<int>(
-            new CommandDefinition(sql, ScalarParameters(request), transaction, cancellationToken: cancellationToken));
+        int pkid;
+        try
+        {
+            pkid = await connection.ExecuteScalarAsync<int>(
+                new CommandDefinition(sql, ScalarParameters(request), transaction, cancellationToken: cancellationToken));
+        }
+        catch (SqlException ex) when (SqlErrorNumbers.IsUniqueViolation(ex.Number))
+        {
+            throw new DuplicateKeyException($"角色代碼「{request.RoleId}」已存在。");
+        }
 
         await SyncUsersAsync(connection, transaction, request.RoleId, request.UserIds, cancellationToken);
 
@@ -213,8 +221,13 @@ public sealed class AppRoleRepository(IDbConnectionFactory connectionFactory, IR
             rows, transaction, cancellationToken: cancellationToken));
     }
 
-    private static List<string> Normalize(IEnumerable<string> ids) =>
-        ids.Where(id => !string.IsNullOrWhiteSpace(id))
+    // Nullable and null-guarded to match the three sibling copies (AppUser, Certification, Course).
+    // System.Text.Json does not enforce non-nullable reference annotations, so a body carrying
+    // "userIds": null sets the property to null and this threw a NullReferenceException (500) on
+    // exactly the input the AppUser path already handled cleanly.
+    private static List<string> Normalize(IEnumerable<string>? ids) =>
+        (ids ?? [])
+           .Where(id => !string.IsNullOrWhiteSpace(id))
            .Select(id => id.Trim())
            .Distinct(StringComparer.OrdinalIgnoreCase)
            .OrderBy(id => id, StringComparer.OrdinalIgnoreCase)

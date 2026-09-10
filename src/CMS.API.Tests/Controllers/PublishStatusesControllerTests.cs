@@ -124,6 +124,25 @@ public class PublishStatusesControllerTests
         _repository.Verify(r => r.CreateAsync(It.IsAny<PublishStatusRequest>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
+    /// <summary>
+    /// The ExistsAsync check above is a read followed by a write, so two callers racing on the same pkid
+    /// both pass it and the second loses on PK_PublishingStatus. The table stays correct — the constraint
+    /// does its job — but the loser used to surface as a 500 rather than the documented 409.
+    /// </summary>
+    [Fact]
+    public async Task Create_Returns409_WhenAConcurrentCreateWonTheRace()
+    {
+        var request = SampleRequest(5);
+        _repository.Setup(r => r.ExistsAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync(false);
+        _repository.Setup(r => r.CreateAsync(request, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new DuplicateKeyException("主代碼 5 已存在。"));
+
+        var result = await _controller.Create(request, CancellationToken.None);
+
+        var conflict = Assert.IsType<ConflictObjectResult>(result.Result);
+        Assert.Equal(StatusCodes.Status409Conflict, conflict.StatusCode);
+    }
+
     // ---- PUT /api/publish-statuses ----
 
     [Fact]

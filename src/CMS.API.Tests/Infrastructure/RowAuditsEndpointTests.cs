@@ -23,6 +23,14 @@ public class RowAuditsEndpointTests
         return client;
     }
 
+    /// <summary>A signed-in caller with no Admin role — an ordinary editor.</summary>
+    private static HttpClient NonAdminClient(CmsApiFactory factory)
+    {
+        var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", CmsApiFactory.IssueToken(roles: ["Editor"]));
+        return client;
+    }
+
     private static RowAudit Entry(DateTime at, string userName, string actionType, string? desc) => new()
     {
         DateTime = at,
@@ -133,5 +141,58 @@ public class RowAuditsEndpointTests
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         factory.RowAuditRepository.Verify(
             r => r.GetForRecordAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    // ---- The account tables' audit trail is administrator-only ----
+    //
+    // Closes an account-takeover chain. AppUsersController and AppRolesController are Admin-only, but
+    // `tableName` arrives from the query string, so this endpoint used to hand their history to any
+    // signed-in caller. The trail also named a password reset to the system default, which made it a
+    // directory of accounts standing on the shared SysConfig.appConfig.defaultPassword: read the trail,
+    // log in as one of them with that known default, and the forced-change screen accepts the default as
+    // the current password. If the account was an administrator, so was the attacker.
+
+    [Theory]
+    [InlineData("AppUser", "helen")]
+    [InlineData("AppRole", "Admin")]
+    [InlineData("appuser", "helen")]
+    public async Task Get_Returns403_ForAnAccountTable_WhenTheCallerIsNotAnAdmin(string tableName, string pkid)
+    {
+        using var factory = new CmsApiFactory();
+        var client = NonAdminClient(factory);
+
+        var response = await client.GetAsync($"{Url}?tableName={tableName}&pkid={pkid}");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        factory.RowAuditRepository.Verify(
+            r => r.GetForRecordAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Get_ReturnsTheAccountTrail_ForAnAdmin()
+    {
+        using var factory = new CmsApiFactory();
+        factory.RowAuditRepository
+            .Setup(r => r.GetForRecordAsync("AppUser", "helen", It.IsAny<CancellationToken>()))
+            .ReturnsAsync([Entry(new DateTime(2026, 9, 8, 14, 30, 0), "alice", "UPDATE", "PasswordHash")]);
+        var client = AuthenticatedClient(factory);
+
+        var response = await client.GetAsync($"{Url}?tableName=AppUser&pkid=helen");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Get_StaysOpenToANonAdmin_ForTheContentTables()
+    {
+        using var factory = new CmsApiFactory();
+        factory.RowAuditRepository
+            .Setup(r => r.GetForRecordAsync("Course", "123", It.IsAny<CancellationToken>()))
+            .ReturnsAsync([Entry(new DateTime(2026, 9, 8, 14, 30, 0), "alice", "UPDATE", "Title")]);
+        var client = NonAdminClient(factory);
+
+        var response = await client.GetAsync($"{Url}?tableName=Course&pkid=123");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 }

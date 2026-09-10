@@ -55,7 +55,18 @@ public class AppRolesController(IAppRoleRepository repository) : ControllerBase
             return Conflict(new { message = $"角色代碼「{request.RoleId}」已存在。" });
         }
 
-        var pkid = await repository.CreateAsync(request, cancellationToken);
+        int pkid;
+        try
+        {
+            pkid = await repository.CreateAsync(request, cancellationToken);
+        }
+        catch (DuplicateKeyException ex)
+        {
+            // The ExistsAsync check above is a read followed by a write, so a concurrent create with the
+            // same key slips past it and loses on the primary key instead. Same 409 either way.
+            return Conflict(new { message = ex.Message });
+        }
+
         var created = new AppRole
         {
             Pkid = pkid,

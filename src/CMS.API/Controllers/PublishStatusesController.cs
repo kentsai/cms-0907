@@ -58,7 +58,18 @@ public class PublishStatusesController(IPublishStatusRepository repository) : Co
             return Conflict(new { message = $"主代碼 {request.Pkid} 已存在。" });
         }
 
-        var pkid = await repository.CreateAsync(request, cancellationToken);
+        byte pkid;
+        try
+        {
+            pkid = await repository.CreateAsync(request, cancellationToken);
+        }
+        catch (DuplicateKeyException ex)
+        {
+            // The ExistsAsync check above is a read followed by a write, so a concurrent create with the
+            // same key slips past it and loses on the primary key instead. Same 409 either way.
+            return Conflict(new { message = ex.Message });
+        }
+
         var created = new PublishStatus
         {
             Pkid = pkid,

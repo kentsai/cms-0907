@@ -13,11 +13,13 @@ namespace CMS.API.Tests.Controllers;
 public class AppUsersControllerTests
 {
     private readonly Mock<IAppUserRepository> _repository = new(MockBehavior.Strict);
+    private readonly Mock<IPasswordStampCache> _passwordStamps = new(MockBehavior.Strict);
     private readonly AppUsersController _controller;
 
     public AppUsersControllerTests()
     {
-        _controller = new AppUsersController(_repository.Object);
+        _passwordStamps.Setup(c => c.Invalidate(It.IsAny<string>()));
+        _controller = new AppUsersController(_repository.Object, _passwordStamps.Object);
     }
 
     private static AppUser Sample(string userId = "helen") => new()
@@ -229,6 +231,22 @@ public class AppUsersControllerTests
         Assert.IsType<NoContentResult>(result);
     }
 
+    /// <summary>
+    /// The reset writes PasswordUpdatedTime, which is the token-revocation stamp, but the bearer handler
+    /// reads that through a per-user cache. Without dropping the cached entry the target's existing token
+    /// kept working for up to PasswordStampCache.CacheDuration — and this reset is the one lever an admin
+    /// has to end a hijacked session. AuthController.ChangePassword has always done this.
+    /// </summary>
+    [Fact]
+    public async Task ResetPassword_InvalidatesTheCachedPasswordStamp_SoTheTargetsTokenDiesOnTheNextRequest()
+    {
+        _repository.Setup(r => r.ResetPasswordAsync("helen", It.IsAny<CancellationToken>())).ReturnsAsync(true);
+
+        await _controller.ResetPassword("helen", CancellationToken.None);
+
+        _passwordStamps.Verify(c => c.Invalidate("helen"), Times.Once);
+    }
+
     [Fact]
     public async Task ResetPassword_ReturnsNotFound_WhenMissing()
     {
@@ -237,6 +255,35 @@ public class AppUsersControllerTests
         var result = await _controller.ResetPassword("ghost", CancellationToken.None);
 
         Assert.IsType<NotFoundResult>(result);
+    }
+
+    [Fact]
+    public async Task ResetPassword_DoesNotInvalidateAnything_WhenTheUserDoesNotExist()
+    {
+        _repository.Setup(r => r.ResetPasswordAsync("ghost", It.IsAny<CancellationToken>())).ReturnsAsync(false);
+
+        await _controller.ResetPassword("ghost", CancellationToken.None);
+
+        _passwordStamps.Verify(c => c.Invalidate(It.IsAny<string>()), Times.Never);
+    }
+
+    /// <summary>
+    /// Create checks ExistsAsync first, but that is a read followed by a write: two callers racing on the
+    /// same UserId both pass it and the second loses on the primary key. The table stays correct — the
+    /// constraint does its job — but the loser used to surface as a 500 rather than the documented 409.
+    /// </summary>
+    [Fact]
+    public async Task Create_Returns409_WhenAConcurrentCreateWonTheRace()
+    {
+        var request = SampleRequest();
+        _repository.Setup(r => r.ExistsAsync("helen", It.IsAny<CancellationToken>())).ReturnsAsync(false);
+        _repository.Setup(r => r.CreateAsync(request, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new DuplicateKeyException("帳號「helen」已存在。"));
+
+        var result = await _controller.Create(request, CancellationToken.None);
+
+        var conflict = Assert.IsType<ConflictObjectResult>(result.Result);
+        Assert.Equal(StatusCodes.Status409Conflict, conflict.StatusCode);
     }
 
     [Fact]

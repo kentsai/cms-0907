@@ -74,7 +74,14 @@ public sealed class PublishStatusRepository(IDbConnectionFactory connectionFacto
         await using var connection = await connectionFactory.CreateOpenConnectionAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
 
-        await connection.ExecuteAsync(new CommandDefinition(sql, request, transaction, cancellationToken: cancellationToken));
+        try
+        {
+            await connection.ExecuteAsync(new CommandDefinition(sql, request, transaction, cancellationToken: cancellationToken));
+        }
+        catch (SqlException ex) when (SqlErrorNumbers.IsUniqueViolation(ex.Number))
+        {
+            throw new DuplicateKeyException($"主代碼 {request.Pkid} 已存在。");
+        }
 
         var created = await GetByIdAsync(connection, request.Pkid, cancellationToken, transaction)
             ?? throw new InvalidOperationException($"{TableName} {request.Pkid} was not found after INSERT.");
