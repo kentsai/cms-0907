@@ -19,23 +19,33 @@
   @bottom-left {
     content: '簡介代碼 ' var(--print-course-id);
     font-size: 8.5pt;
-    color: #777;
+    // #777 is 4.48:1 on white, just under the AA floor, at ~11px in 繁體中文 — and these are the
+    // identifiers someone reads off a printed sheet to find the record again. #666 is 5.74:1 and is
+    // already what the rest of the sheet uses.
+    color: #666;
   }
   @bottom-center {
     content: '列印日期 ' var(--print-date);
     font-size: 8.5pt;
-    color: #777;
+    // #777 is 4.48:1 on white, just under the AA floor, at ~11px in 繁體中文 — and these are the
+    // identifiers someone reads off a printed sheet to find the record again. #666 is 5.74:1 and is
+    // already what the rest of the sheet uses.
+    color: #666;
   }
   @bottom-right {
     content: '第 ' counter(page) ' 頁';
     font-size: 8.5pt;
-    color: #777;
+    // #777 is 4.48:1 on white, just under the AA floor, at ~11px in 繁體中文 — and these are the
+    // identifiers someone reads off a printed sheet to find the record again. #666 is 5.74:1 and is
+    // already what the rest of the sheet uses.
+    color: #666;
   }
 }
 
 .course-print {
   display: block;
   min-height: 100vh;
+  min-height: 100dvh;
   padding: 12px;
   background: #e5e5e5;
   color: #222;

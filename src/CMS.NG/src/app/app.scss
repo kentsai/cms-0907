@@ -5,7 +5,11 @@
   grid-template-areas:
     'topbar topbar'
     'sidebar content';
+  // `vh` measures the viewport with the mobile URL bar retracted, so a `100vh` shell is taller than the
+  // space actually visible on iOS Safari / Chrome Android. `dvh` tracks the live viewport; the `vh` line
+  // above it stays as the fallback for browsers without `dvh`.
   height: 100vh;
+  height: 100dvh;
   transition: grid-template-columns 0.2s ease;
 }
 

@@ -63,10 +63,24 @@
   gap: 0.75rem;
   padding: 0.75rem 1rem;
 
+  /* The fourth flex-nowrap header family (the other three are handled by the shared 640px block in
+     styles.scss — see the note there). 上一週 + an 8rem label + 下一週 + 本週 add up to more than a
+     375px phone leaves, and because this row is centre-justified the overflow splits to BOTH sides.
+     Content overflowing to the *left* of a scroll container cannot be reached at all, so 上一週 became
+     permanently unreachable. Wrap from the start edge instead. */
+  @media (max-width: 640px) {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+
   &__label {
     font-weight: 600;
     min-width: 8rem;
     text-align: center;
+
+    @media (max-width: 640px) {
+      min-width: 0;
+    }
   }
 
   &__loading {

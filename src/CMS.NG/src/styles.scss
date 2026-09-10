@@ -1,5 +1,13 @@
 /* Global styles for the CMS admin shell. */
 
+:root {
+  // Aura's `--p-red-500` is #ef4444, which is 3.76:1 on white — under the WCAG AA 4.5:1 floor for
+  // normal text. Validation messages and required-field asterisks are the *only* signal that a field
+  // failed, so they must clear it: #dc2626 is 5.42:1. Borders are exempt (3:1 applies to non-text),
+  // which is why `.cell-invalid` in course-list.component.scss keeps `--p-red-500`.
+  --cms-error-color: var(--p-red-600, #dc2626);
+}
+
 html,
 body {
   height: 100%;
@@ -71,6 +79,11 @@ body {
   .app-topbar__logout .p-button-label {
     white-space: nowrap;
   }
+
+  /* There is a FOURTH flex-nowrap header family, `.week-nav` on the promo board. Its rule lives in
+     featured-promo-list.component.scss, not here: that component sets `justify-content: center` in its
+     own stylesheet, and component styles are injected after this file, so a global override at equal
+     specificity would silently lose. Fixing any family means checking all four. */
 }
 
 .field {
@@ -86,8 +99,26 @@ body {
 }
 
 .field-error {
-  color: var(--p-red-500);
-  font-size: 0.8125rem;
+  color: var(--cms-error-color);
+  // 0.875rem is the floor for 繁體中文: CJK glyphs carry several times the stroke density of Latin at
+  // the same em size, and below 14px the strokes start merging. This is the text that explains why a
+  // save failed, so it is the last text that should be hard to read.
+  font-size: 0.875rem;
+}
+
+/* Row-action buttons (檢視 / 編輯 / 刪除, and 上移 / 下移 / 複製 on the promo board) are icon-only
+   `size="small"`, which Aura renders at 1.75rem — a 28px tap target, well under the 44px minimum.
+   The sidebar links were raised to 44px separately; these are the same class of control. */
+.p-datatable .col-actions .p-button-icon-only,
+.row__actions .p-button-icon-only {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+/* Used by the partner and course list tables for an em-dash placeholder. The class was referenced by
+   both templates but never defined, so the placeholder rendered in full body colour. */
+.muted-if-empty {
+  color: var(--p-text-muted-color);
 }
 
 /* List tables, shared by all eight list pages (each wraps its table in `.page-body { overflow-x: auto }`).

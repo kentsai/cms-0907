@@ -62,11 +62,11 @@ form {
 }
 
 .required {
-  color: var(--p-red-500);
+  color: var(--cms-error-color);
 }
 
 .error {
-  color: var(--p-red-500);
+  color: var(--cms-error-color);
 }
 
 ::ng-deep .form-card .w-full,

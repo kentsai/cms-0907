@@ -1,10 +1,15 @@
+// `dvh` tracks the live mobile viewport; `vh` assumes the URL bar is retracted, which pushed the 登入
+// button under the browser chrome on first paint — on the very first screen of the product. The `vh`
+// line stays above each `dvh` line as the fallback.
 :host {
   display: block;
   min-height: 100vh;
+  min-height: 100dvh;
 }
 
 .login-page {
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -58,7 +63,7 @@ form {
 }
 
 .error {
-  color: var(--p-red-500);
+  color: var(--cms-error-color);
 }
 
 ::ng-deep .login-error,
