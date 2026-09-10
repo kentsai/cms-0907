@@ -161,7 +161,7 @@ to the static files it serves; proxied `/api` responses keep the API's own.
 | `Permissions-Policy` | camera / mic / geolocation / payment / usb all `()` | — |
 | `Cache-Control` | hashed bundles cached a year, `index.html` no-cache | `no-store` (responses are bearer-protected) |
 | `Strict-Transport-Security` | outbound rule, only when `{HTTPS} = on` | only when the request arrived over HTTPS |
-| `Server` / `X-Powered-By` | removed | removed (Kestrel's is off in `Program.cs`) |
+| `Server` / `X-Powered-By` | `removeServerHeader` + `<clear />` | same (Kestrel's `Server` is off in `Program.cs`) |
 
 Both HSTS rules are **inert on the default HTTP-only bindings** — deliberately, since a browser ignores the
 header over plain HTTP. Add an HTTPS binding and both start emitting with no further edit.
@@ -186,6 +186,7 @@ header over plain HTTP. Add an HTTPS binding and both start emitting with no fur
 | Deployed, but the browser shows the **old app** | Hard-refresh. `index.html` is served no-cache by the stamped `web.config`; a stale copy pins the old hashed bundle names. |
 | Page loads **unstyled**, console says a script or style was **refused** | A CSP violation. Most likely `optimization.styles.inlineCritical` was turned back on in `angular.json` (it emits an inline `onload=`), or an inline `<script>`/`onclick=` was added. Fix the markup rather than loosening `script-src`. |
 | `500.19` on the SPA site mentioning **`outboundRules`** or **`removeServerHeader`** | URL Rewrite is not installed (outbound rules are its feature), or IIS is older than 10 / 1709 (`removeServerHeader`). `setup-iis.ps1` installs URL Rewrite; on an older IIS, delete the `<security>` block from `CMS.NG\web.config.template`. |
+| **`X-Powered-By:` present but empty** | The header config was inside `<location path="." inheritInChildApplications="false">`, where `<remove>` has no inherited collection to act on and IIS leaves the slot behind. Both templates now put `<httpProtocol>` / `<security>` at **site level**, outside that block, and use `<clear />`. If it persists, something re-adds it downstream — check the ARR proxy path and `applicationHost.config`, then `Clear-WebConfiguration -Filter system.webServer/httpProtocol/customHeaders -PSPath 'MACHINE/WEBROOT/APPHOST'` to drop it server-wide. |
 | `dotnet publish` fails | Run it by hand in `src\CMS.API`. |
 | `npm run build` fails | Run it by hand in `src\CMS.NG`. `deploy.ps1` runs `npm ci` automatically only when `node_modules` is absent. |
 | Angular build output not found | Don't use `-SkipBuild` before a successful build has run. |

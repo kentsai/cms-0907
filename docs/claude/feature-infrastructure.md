@@ -167,8 +167,14 @@ Two sets, because two servers answer: Kestrel/ANCM serves `/api`, IIS serves the
   `style-src 'self' 'unsafe-inline'` (Angular emulated encapsulation and the PrimeNG theme inject `<style>` at
   runtime; a nonce would need a server rendering `index.html` per request, which a static site is not),
   `img-src 'self' data:` (the QR `<canvas>`), `connect-src 'self'` (the API is same-origin behind the proxy).
-  `removeServerHeader` and a `remove` of `X-Powered-By` drop IIS's own advertisements; HSTS is an
-  **outbound rule** conditional on `{HTTPS} = on`, so it stays inert until an HTTPS binding exists.
+  `removeServerHeader` and a `<clear />` of the inherited `customHeaders` drop IIS's own advertisements; HSTS is
+  an **outbound rule** conditional on `{HTTPS} = on`, so it stays inert until an HTTPS binding exists.
+  Both templates put `<httpProtocol>` and `<security>` at **site level, outside** the
+  `<location path="." inheritInChildApplications="false">` block. That block is the ASP.NET Core convention for
+  the handler and `aspNetCore` settings only. Header config inside it does not work: with inheritance switched
+  off there is no inherited collection for `<remove>` to act on, so the server-level `X-Powered-By` survives —
+  and IIS can then emit it with an **empty value**, a leftover slot rather than a removal. `<clear />` at site
+  level is what actually drops it.
   Proxied `/api` responses keep the API's headers — `customHeaders` only applies to what IIS itself serves.
 
 `script-src 'self'` is why `angular.json` sets `optimization.styles.inlineCritical: false`: the critical-CSS

@@ -34,17 +34,30 @@
           <environmentVariable name="ConnectionStrings__CMS" value="{{CONNECTION_STRING}}" />
         </environmentVariables>
       </aspNetCore>
-
-      <!-- The app sets its own security headers (Infrastructure\SecurityHeadersMiddleware) and Kestrel's Server
-           header is off in Program.cs. These two remove what IIS itself would add on top. -->
-      <httpProtocol>
-        <customHeaders>
-          <remove name="X-Powered-By" />
-        </customHeaders>
-      </httpProtocol>
-      <security>
-        <requestFiltering removeServerHeader="true" />
-      </security>
     </system.webServer>
   </location>
+
+  <!-- Deliberately OUTSIDE the <location> block above.
+       That block carries inheritInChildApplications="false", which is the ASP.NET Core convention for keeping
+       the handler and aspNetCore settings from leaking into child applications. Header configuration must not
+       live there: with inheritance switched off, <remove name="X-Powered-By" /> has no inherited collection to
+       act on, so the server-level header survives — and IIS can emit it with an EMPTY value, which is exactly
+       the leftover slot this arrangement produces.
+
+       <clear /> rather than <remove>: it drops the whole inherited customHeaders collection in one step, so
+       nothing from applicationHost.config can survive by name. This site adds no headers of its own — the app
+       sets them in process (Infrastructure\SecurityHeadersMiddleware) and Kestrel's Server header is off in
+       Program.cs — so an empty collection is exactly right here. -->
+  <system.webServer>
+    <httpProtocol>
+      <customHeaders>
+        <clear />
+      </customHeaders>
+    </httpProtocol>
+
+    <!-- No "Server: Microsoft-IIS/10.0" advertisement (IIS 10 1709+). Site level, not inside <location>. -->
+    <security>
+      <requestFiltering removeServerHeader="true" />
+    </security>
+  </system.webServer>
 </configuration>
