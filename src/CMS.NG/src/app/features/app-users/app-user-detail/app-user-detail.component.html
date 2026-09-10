@@ -1,0 +1,73 @@
+<p-toolbar styleClass="page-toolbar">
+  <ng-template #start>
+    <div class="toolbar-title">
+      <h1>使用者</h1>
+      @if (item(); as it) {
+        <span class="toolbar-title__sub">{{ it.userId }}　{{ it.userName }}</span>
+        <app-row-audit-badge tableName="AppUser" [pkid]="it.userId" />
+      }
+    </div>
+  </ng-template>
+  <ng-template #end>
+    <div class="toolbar-actions">
+      <p-button label="返回" icon="pi pi-arrow-left" severity="secondary" [outlined]="true" (onClick)="back()" />
+      <p-button label="編輯" icon="pi pi-pencil" [disabled]="!item()" (onClick)="edit()" />
+      <p-button label="重設密碼" icon="pi pi-key" severity="warn" [outlined]="true" [disabled]="!item() || resetting()" [loading]="resetting()" (onClick)="confirmResetPassword()" />
+      <p-button label="刪除" icon="pi pi-trash" severity="danger" [outlined]="true" [disabled]="!item()" (onClick)="confirmDelete()" />
+    </div>
+  </ng-template>
+</p-toolbar>
+
+@if (loading()) {
+  <p class="state">載入中…</p>
+} @else if (notFound()) {
+  <p-card>
+    <p class="state">找不到使用者代碼「{{ userId }}」的使用者。</p>
+  </p-card>
+} @else if (item(); as it) {
+  <p-card header="使用者資料" styleClass="detail-card">
+    <dl class="detail-grid">
+      <dt>主代碼</dt>
+      <dd>{{ it.pkid }}</dd>
+
+      <dt>使用者代碼</dt>
+      <dd>{{ it.userId }}</dd>
+
+      <dt>使用者名稱</dt>
+      <dd>{{ it.userName }}</dd>
+
+      <dt>啟用</dt>
+      <dd><p-tag [severity]="it.isActive ? 'success' : 'secondary'" [value]="it.isActive ? '啟用' : '停用'" /></dd>
+
+      <dt>密碼更新時間</dt>
+      <dd>{{ it.passwordUpdatedTime ? (it.passwordUpdatedTime + 'Z' | date:'yyyy-MM-dd HH:mm') : '—' }}</dd>
+    </dl>
+  </p-card>
+
+  <p-card styleClass="detail-card">
+    <ng-template #header>
+      <div class="card-header">
+        <span class="card-header__title">角色</span>
+        <p-tag severity="secondary" [value]="it.roleCount + ' 個'" />
+      </div>
+    </ng-template>
+    @if (assignedRoles().length > 0) {
+      <div class="role-chips">
+        @for (label of assignedRoles(); track label) {
+          <p-tag severity="info" icon="pi pi-users" [value]="label" />
+        }
+      </div>
+    } @else {
+      <p class="state">尚未指派角色。</p>
+    }
+    <div class="related-links">
+      <p-button
+        label="查看角色"
+        icon="pi pi-users"
+        severity="secondary"
+        [outlined]="true"
+        routerLink="/admin/app-roles"
+        [queryParams]="{ userId: it.userId }" />
+    </div>
+  </p-card>
+}

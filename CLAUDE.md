@@ -1,107 +1,88 @@
 # CMS
 
-Full-stack CMS scaffolded from an existing SQL Server database schema.
-Backend: .NET 9 Web API + Dapper. Frontend: Angular 20 + PrimeNG.
+.NET 9 Web API + Dapper (`src\CMS.API`, xUnit tests in `src\CMS.API.Tests`) and Angular 20 +
+PrimeNG Aura (`src\CMS.NG`), scaffolded from the SQL Server schema in `database\*.sql`.
+Feature specs: `spec\{sub-system}\{Table}.md`; login / JWT / profile / change-password flows are
+specified in `spec\auth\Auth.md`. Approved implementation plans (design decisions, with the commit that
+built them) live in `plans\YYYY-MM-DD-<feature>.md`. New features: run `/crud`.
 
-## Layout
-
-```
-database\              *.sql schema files (source of truth for the data model)
-spec\                  code-gen.convention.md, ui-sample-*.png
-src\
-  global.json          pins the SDK to 9.0.317 (machine also has 10.0.400)
-  CMS.sln
-  CMS.API\             .NET 9 Web API, controllers + Dapper
-  CMS.API.Tests\       xUnit + Moq, references CMS.API
-  CMS.NG\              Angular 20, standalone components, PrimeNG
-```
-
-## Commands
-
-Run the API and the frontend in **separate terminals** — the frontend calls the API
-directly and there is no dev-server proxy.
+## Commands (API and frontend in separate terminals, no proxy)
 
 ```powershell
-# API -> http://localhost:5000, Swagger UI at /swagger
-dotnet run --project C:\dev\cms\src\CMS.API
-
-# Frontend -> http://localhost:4200
-cd C:\dev\cms\src\CMS.NG; npm start
-
-# Tests
+dotnet run --project C:\dev\cms\src\CMS.API          # http://localhost:5000, /swagger
+cd C:\dev\cms\src\CMS.NG; npm start                   # http://localhost:4200
 dotnet test C:\dev\cms\src\CMS.sln
-cd C:\dev\cms\src\CMS.NG; npm test                       # interactive (Karma + Jasmine)
 cd C:\dev\cms\src\CMS.NG; npx ng test --watch=false --browsers=ChromeHeadless
 ```
 
-## Backend conventions
+## Deploy to IIS (`deploy\`, runbook `DEPLOY-IIS.md`)
 
-- **Dapper only — no Entity Framework.** Repositories take an `IDbConnectionFactory`
-  (`Infrastructure\`) and call `CreateOpenConnectionAsync`.
-- **All API actions and data access are async**, with `CancellationToken` flowed through.
-- Connection string lives under `ConnectionStrings:CMS` in `appsettings.json`
-  (`Server=.\SQLEXPRESS;Database=CMS;Trusted_Connection=True;...`).
-- Swagger is **Swashbuckle 7.2.0**, pinned by request. The .NET 9 template ships
-  `Microsoft.AspNetCore.OpenApi`/`AddOpenApi` instead — that package was deliberately
-  removed. Don't reintroduce it; use `AddSwaggerGen`/`UseSwagger`/`UseSwaggerUI`.
-- Swagger UI is enabled in **all** environments, not just Development.
-- CORS policy `LocalhostCorsPolicy` allows any **loopback** origin (`uri.IsLoopback`),
-  so any localhost port works without editing a whitelist.
-- `Program.cs` ends with `public partial class Program;` so tests can reference the
-  entry-point assembly.
-- There is no `UseHttpsRedirection` — the app is HTTP-only on port 5000 by design.
+```powershell
+cd C:\dev\cms\deploy                                  # elevated PowerShell
+.\setup-iis.ps1 -GrantSqlAccess                       # once: IIS + Hosting Bundle + URL Rewrite + ARR, pools, sites, SQL login
+.\deploy.ps1                                          # every time: publish API + build NG, stamp web.config, cycle pool, copy
+.\deploy.ps1 -ApiOnly | -NgOnly | -SkipBuild
+```
 
-## Frontend conventions
+Two IIS sites: `CMS` (:80, `C:\VHome\CMS\NG`, the Angular dist) reverse-proxies `/api/*` via URL Rewrite + ARR
+to `CMS.API` (:5001, `C:\VHome\CMS\API`, AspNetCoreModuleV2 in-process). Production `environment.ts` therefore
+has `apiBaseUrl: '/api'` (same-origin); only `environment.development.ts` points at `http://localhost:5000/api`.
+Both `web.config`s are stamped from `deploy\{CMS.API,CMS.NG}\web.config.template` at deploy time, never
+committed; the connection string and `ASPNETCORE_ENVIRONMENT` are injected there (CONFIG block at the top of
+`deploy.ps1`). It stamps `ASPNETCORE_ENVIRONMENT=Production`: no Swagger on a deployed site (Development-only);
+smoke-test with `GET :5001/api/publish-statuses` (401 without a token = up).
+`deploy\publish\` is build output (gitignored). The `CMS` database and its `SysConfig.appConfig` row must exist.
 
-- **Standalone components**; no NgModules.
-- **No proxy.** The API base URL comes from `src\environments\environment*.ts`
-  (`apiBaseUrl`). `environment.ts` is production; `environment.development.ts` replaces
-  it via `fileReplacements` in the development build configuration.
-- Path aliases in `tsconfig.json`: `@environments/*`, `@app/*`, `@core/*`, `@features/*`.
-- PrimeNG is configured in `app.config.ts` via `providePrimeNG` with the **Aura** preset,
-  alongside `provideAnimationsAsync()` and `provideHttpClient(withFetch())`.
-  `primeicons.css` is loaded from `angular.json` `styles`, not imported in SCSS.
-- Test setup is the Angular default (**Karma + Jasmine**) — keep it; do not migrate to
-  Vitest/Jest.
-- Components using the app shell need `provideRouter([])` and `provideNoopAnimations()`
-  in `TestBed`, or PrimeNG animations will throw.
+## Rules (details in `docs\claude\environment.md`)
 
-### App shell
+- Dapper only, no EF; everything async with `CancellationToken`.
+- Standalone Angular components; tests stay on Karma + Jasmine.
+- Pinned: Swashbuckle 7.2.0 (never `Microsoft.AspNetCore.OpenApi`), `@angular/animations`
+  20.3.x explicit; never `--legacy-peer-deps`.
+- Files with Chinese text: edit with Write/Edit tools, never Bash `perl`/heredocs.
+- No local `CMS` database: unit tests pass, live data calls fail.
+- MSB3027 on `CMS.API.exe` = API running; build with `-p:ArtifactsPath=<tmp>` instead of killing it.
+- Every API action except `POST /api/auth/login` needs a Bearer JWT (global filter). The account / role
+  endpoints (`AppUsersController`, `AppRolesController`, the `app-users` + `app-roles` lookups) and
+  `PublishStatusesController` additionally require the `Admin` role via
+  `[Authorize(Policy = AuthorizationPolicies.Admin)]` — 403 otherwise; the SPA mirrors it with `adminGuard`.
+  The `publish-statuses` **lookup** stays open to every signed-in user: it fills the course form's 上架狀態
+  dropdown. `GET /api/row-audits` is guarded by value, not by attribute: `tableName` `AppUser` / `AppRole`
+  (case-insensitive, after trimming) needs the `Admin` role — 403 otherwise — while every content table's
+  trail stays open to any signed-in user. `PasswordHash` never crosses the API, and a password change revokes older
+  tokens — self-service *and* an admin reset, which invalidates the target's `PasswordStampCache` entry so the
+  next request with the old token is 401. A login with the default password gets a token that only opens `change-password` (403 elsewhere;
+  SPA route `/change-password`).
+- Passwords are salted PBKDF2 (`PasswordHasher.Hash` / `.Verify`); legacy unsalted SHA-256 rows still verify
+  and are rewritten in place on the owner's next login. Never store `Sha256Hex` output.
+- Swagger is Development-only (`app.Environment.IsDevelopment()` in `Program.cs`): `dotnet run` has it at
+  `:5000/swagger`, a deployed site never does. Never stamp `Development` on a server to get it back.
+- Security headers: the API sets its own on every response (`Infrastructure\SecurityHeadersMiddleware`, first in
+  the pipeline, `no-store` + `default-src 'none'`; `/swagger` gets a looser policy so the UI runs). The SPA's set
+  lives in `deploy\CMS.NG\web.config.template`. Its CSP has **no `'unsafe-inline'` for scripts**, which is why
+  `angular.json` sets `optimization.styles.inlineCritical: false` — the critical-CSS inliner emits an inline
+  `onload=` handler that the policy blocks. Don't re-enable it, and don't add inline `<script>` to `index.html`.
+- Chromeless routes: a route with `data: { chromeless: true }` (the course print view
+  `/course/courses/:id/print`) renders only the outlet, no shell / toast / confirm dialog (`app.ts`).
 
-`src\app\app.ts` is the shell: topbar + collapsible sidebar (CSS grid) + `router-outlet`.
-The sidebar is a PrimeNG `PanelMenu` driven by the `menuItems` array. Add new features as
-entries there.
+## Reference notes (read on demand)
 
-Current menu: `系統管理 Admin` → `角色 AppRole` → routes to `/admin/app-roles`.
+| File | When |
+|---|---|
+| `docs\claude\feature-infrastructure.md` | Repo layout; building/changing a CRUD feature, lookup, audit, shell menu, TestBed |
+| `docs\claude\feature-status.md` | What is built (with test totals), non-obvious feature behaviour, next tables |
+| `docs\claude\environment.md` | A build, install, shell, or tool misbehaves; what this box has (and lacks) for an IIS deploy |
+| `DEPLOY-IIS.md` | Deploying to IIS: topology, one-time setup, remote servers, troubleshooting table |
+| `CHANGELOG.md` / `VERSION` | What shipped in each release, in user-facing wording; the current `MAJOR.MINOR.PATCH.MICRO` |
+| `TODOS.md` | Known gaps and deferred work, with a Completed section stamped by release |
 
-## Environment gotchas
+## gstack
 
-These cost real time in a previous session — check them before debugging further.
-
-- **PowerShell execution policy.** All persistent scopes were `Undefined`, so Windows fell
-  back to `Restricted` and refused to load `npm.ps1` (`npm start` failed with
-  `UnauthorizedAccess`). Fixed with
-  `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`. If it recurs, `npm.cmd start`
-  works without changing policy.
-- **`@angular/animations` must stay on 20.3.x.** npm otherwise resolves it to 20.1.8 to
-  satisfy PrimeNG's peer range, which pins `@angular/common` to that exact version and
-  breaks the install with `ERESOLVE`. It is an explicit dependency for this reason —
-  don't "clean it up". Do **not** paper over this with `--legacy-peer-deps`.
-- **Two SDKs are installed** (9.0.317 and 10.0.400). `global.json` forces 9.0.317. Without
-  it, packages resolve to net10.0-only builds — this is why
-  `Microsoft.AspNetCore.Mvc.Testing` could not be added (latest is net10.0-only). Pin the
-  version if that package is ever needed.
-- Node lives at `C:\Program Files\nodejs`; it is not always on `PATH` in non-interactive
-  shells.
-
-## Status
-
-Scaffolding is complete and verified: solution builds with 0 warnings, API returns 200 on
-`/swagger`, `ng build` succeeds, and 4 Angular tests pass.
-
-**Not yet built — blocked on missing inputs.** `database\` and `spec\` are empty. The
-first feature (AppRole CRUD: list with query filter, view, edit, add, plus xUnit and
-Angular tests) needs `database\auth.sql` for the real column names, and
-`spec\code-gen.convention.md` for naming/layering. The shell's `/admin/app-roles` link
-currently has no route behind it. The shell styling is a conventional admin layout, not
-derived from `spec\ui-sample-*.png`, which were never supplied.
+gstack (`~/.claude/skills/gstack`) is installed. Use the `/browse` skill from gstack for all web
+browsing; never use `mcp__claude-in-chrome__*` tools. Available skills: `/office-hours`,
+`/plan-ceo-review`, `/plan-eng-review`, `/plan-design-review`, `/design-consultation`,
+`/design-shotgun`, `/design-html`, `/review`, `/ship`, `/land-and-deploy`, `/canary`, `/benchmark`,
+`/browse`, `/connect-chrome`, `/qa`, `/qa-only`, `/design-review`, `/setup-browser-cookies`,
+`/setup-deploy`, `/setup-gbrain`, `/retro`, `/investigate`, `/document-release`,
+`/document-generate`, `/codex`, `/cso`, `/autoplan`, `/plan-devex-review`, `/devex-review`,
+`/careful`, `/freeze`, `/guard`, `/unfreeze`, `/gstack-upgrade`, `/learn`.

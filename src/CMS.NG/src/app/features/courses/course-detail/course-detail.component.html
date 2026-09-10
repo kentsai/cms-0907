@@ -1,0 +1,174 @@
+<p-toolbar styleClass="page-toolbar">
+  <ng-template #start>
+    <div class="toolbar-title">
+      <h1>課程</h1>
+      @if (item(); as it) {
+        <span class="toolbar-title__sub">{{ it.pkid }}　{{ it.courseId }}　{{ it.title }}</span>
+        <app-row-audit-badge tableName="Course" [pkid]="it.pkid" />
+      }
+    </div>
+  </ng-template>
+  <ng-template #end>
+    <div class="toolbar-actions">
+      <p-button label="返回" icon="pi pi-arrow-left" severity="secondary" [outlined]="true" (onClick)="back()" />
+      <p-button
+        class="toolbar-print"
+        label="列印PDF"
+        icon="pi pi-print"
+        severity="secondary"
+        [outlined]="true"
+        [disabled]="!item()"
+        (onClick)="openPrint()" />
+      <p-button label="編輯" icon="pi pi-pencil" [disabled]="!item()" (onClick)="edit()" />
+      <p-button label="刪除" icon="pi pi-trash" severity="danger" [outlined]="true" [disabled]="!item()" (onClick)="confirmDelete()" />
+    </div>
+  </ng-template>
+</p-toolbar>
+
+@if (loading()) {
+  <p class="state">載入中…</p>
+} @else if (notFound()) {
+  <p-card>
+    <p class="state">找不到主代碼 {{ pkid }} 的課程。</p>
+  </p-card>
+} @else if (item(); as it) {
+  <p-card header="基本資料" styleClass="detail-card">
+    <div class="basic-info">
+      <dl class="detail-grid">
+        <dt>主代碼</dt>
+        <dd>{{ it.pkid }}</dd>
+
+        <dt>課程名稱</dt>
+        <dd>{{ it.title }}</dd>
+
+        <dt>官方課程名稱</dt>
+        <dd>{{ it.officialTitle || '—' }}</dd>
+
+        <dt>簡介代碼</dt>
+        <dd><code>{{ it.courseId }}</code></dd>
+
+        <dt>科目代碼</dt>
+        <dd><code>{{ it.prodCourseId }}</code></dd>
+
+        <dt>友善網址</dt>
+        <dd><code>{{ it.friendlyUrl }}</code></dd>
+
+        <dt>顯示順序</dt>
+        <dd>{{ it.displayOrder }}</dd>
+
+        <dt>原廠</dt>
+        <dd>
+          <a [routerLink]="['/course/partners', it.partnerPkid]" class="fk-link">{{ it.partnerName }}</a>
+        </dd>
+
+        <dt>課程群組</dt>
+        <dd>
+          @if (it.courseGroupPkid !== null) {
+            <a [routerLink]="['/course/course-groups', it.courseGroupPkid]" class="fk-link">{{ it.courseGroupDescription }}</a>
+          } @else {
+            —
+          }
+        </dd>
+
+        <dt>上架狀態</dt>
+        <dd>
+          <a [routerLink]="['/admin/publish-statuses', it.publishStatusPkid]" class="fk-link">{{ it.publishStatusDescription }}</a>
+        </dd>
+
+        <dt>上架日期</dt>
+        <dd>{{ it.scheduleOn }}</dd>
+
+        <dt>下架日期</dt>
+        <dd>{{ it.scheduleOff }}</dd>
+
+        <dt>時數</dt>
+        <dd>{{ it.hour }}</dd>
+
+        <dt>定價</dt>
+        <dd>{{ it.listPrice | number:'1.0-0' }}</dd>
+
+        <dt>點數</dt>
+        <dd>{{ it.learningCredit | number:'1.1-1' }}</dd>
+
+        <dt>允許重聽</dt>
+        <dd>{{ it.canRepeat ? '是' : '否' }}</dd>
+      </dl>
+
+      <aside class="basic-info__qr">
+        <app-qr-code [text]="qrUrl()" [title]="it.courseId" [fileName]="it.courseId + '.png'" />
+        <a class="basic-info__qr-link" [href]="qrUrl()" target="_blank" rel="noopener">{{ qrUrl() }}</a>
+      </aside>
+    </div>
+  </p-card>
+
+  <p-card header="課程內容" styleClass="detail-card">
+    <dl class="detail-grid detail-grid--text">
+      <dt>教材</dt>
+      <dd>{{ it.material || '—' }}</dd>
+
+      <dt>課程目標</dt>
+      <dd>{{ it.objective || '—' }}</dd>
+
+      <dt>適合對象</dt>
+      <dd>{{ it.target || '—' }}</dd>
+
+      <dt>先備知識</dt>
+      <dd>{{ it.prerequisites || '—' }}</dd>
+
+      <dt>課程大綱</dt>
+      <dd>{{ it.outline || '—' }}</dd>
+
+      <dt>考試／認證說明</dt>
+      <dd>{{ it.towardCertOrExam || '—' }}</dd>
+
+      <dt>備註</dt>
+      <dd>{{ it.note || '—' }}</dd>
+
+      <dt>其他資訊</dt>
+      <dd>{{ it.otherInfo || '—' }}</dd>
+    </dl>
+  </p-card>
+
+  <p-card header="認證與職務類別" styleClass="detail-card">
+    <dl class="detail-grid">
+      <dt>認證</dt>
+      <dd>{{ certificationLabels().length ? certificationLabels().join('、') : '—' }}</dd>
+
+      <dt>職務類別</dt>
+      <dd>{{ jobCategoryLabels().length ? jobCategoryLabels().join('、') : '—' }}</dd>
+    </dl>
+  </p-card>
+
+  <p-card header="相關資料" styleClass="detail-card">
+    <div class="related-links">
+      <p-button
+        label="查看課程問答"
+        icon="pi pi-question-circle"
+        severity="secondary"
+        [outlined]="true"
+        routerLink="/course/course-faqs"
+        [queryParams]="{ coursePkid: it.pkid }" />
+      <p-button
+        label="查看相關連結"
+        icon="pi pi-link"
+        severity="secondary"
+        [outlined]="true"
+        routerLink="/course/course-related-links"
+        [queryParams]="{ coursePkid: it.pkid }" />
+      <p-button
+        label="查看熱門課程"
+        icon="pi pi-star"
+        severity="secondary"
+        [outlined]="true"
+        routerLink="/course/hot-courses"
+        [queryParams]="{ coursePkid: it.pkid }" />
+      <p-button
+        label="查看推薦課程"
+        icon="pi pi-thumbs-up"
+        severity="secondary"
+        [outlined]="true"
+        routerLink="/course/course-recomms"
+        [queryParams]="{ courseId: it.courseId }" />
+    </div>
+  </p-card>
+}

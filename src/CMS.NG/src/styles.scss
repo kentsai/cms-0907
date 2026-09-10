@@ -1,11 +1,27 @@
 /* Global styles for the CMS admin shell. */
 
+:root {
+  // Aura's `--p-red-500` is #ef4444, which is 3.76:1 on white — under the WCAG AA 4.5:1 floor for
+  // normal text. Validation messages and required-field asterisks are the *only* signal that a field
+  // failed, so they must clear it: #dc2626 is 5.42:1. Borders are exempt (3:1 applies to non-text),
+  // which is why `.cell-invalid` in course-list.component.scss keeps `--p-red-500`.
+  --cms-error-color: var(--p-red-600, #dc2626);
+}
+
 html,
 body {
   height: 100%;
   margin: 0;
-  font-family: 'Segoe UI', 'Microsoft JhengHei', system-ui, -apple-system, sans-serif;
+  // Name the Traditional Chinese faces explicitly, and name one per platform. `Microsoft JhengHei` ships
+  // only on Windows, so the old stack fell straight through to `system-ui` everywhere else — and on most
+  // non-Windows systems that resolves to a CJK face whose default glyph forms are *Simplified*, which
+  // renders 繁體中文 with the wrong shapes. Same stack the print view has used since it was written.
+  font-family: 'Segoe UI', 'Microsoft JhengHei', 'PingFang TC', 'Noto Sans TC', system-ui, -apple-system,
+    sans-serif;
   color: var(--p-text-color);
+  // CJK glyphs are dense and square; the browser default of roughly 1.2 crowds them. PrimeNG's own
+  // components already render at 1.5.
+  line-height: 1.6;
   background: var(--p-surface-50);
 }
 
@@ -13,18 +29,61 @@ body {
   box-sizing: border-box;
 }
 
+// No `margin-bottom` here on purpose. All eight list pages nest this inside `.page`, which is a
+// `flex-direction: column` with `gap: 1rem`, and each of them re-declares `.page-header` in its own scoped
+// stylesheet without resetting margin — so the global margin survived on top of the gap and every list page
+// rendered a measured 32px between the header card and the table where 16px was intended.
 .page-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  margin-bottom: 1rem;
 }
 
 .page-title {
   margin: 0;
   font-size: 1.25rem;
   font-weight: 600;
+}
+
+/* Detail / edit toolbars (`.toolbar-title` + `.toolbar-actions`, shared by every feature page) and the
+   list-page header (`.page-header`, the same flex row one card up) on phones: let the title row wrap
+   instead of shrinking the heading to one character per line and overflowing sideways. The `.page-header`
+   rules stay global because every list component re-declares `.page-header` in its own scoped stylesheet
+   and none of them sets `flex-wrap`, and because the button label lives inside PrimeNG's own template,
+   out of reach of the host component's emulated encapsulation. */
+@media (max-width: 640px) {
+  .toolbar-title,
+  .toolbar-actions,
+  .page-header,
+  .page-header__title,
+  .page-header__actions {
+    flex-wrap: wrap;
+  }
+
+  .toolbar-title h1,
+  .page-header__title h1,
+  .page-header__actions .p-button-label {
+    white-space: nowrap;
+  }
+
+  /* Topbar on phones: its children already add up to the full 375px, so every label broke one character
+     per line. Drop the `個人資料` / `請先變更密碼` hint — the user icon and name still link to the profile,
+     and the locked screen repeats that hint in its own banner — which buys back the ~55px the rest needs. */
+  .app-topbar__user-hint {
+    display: none;
+  }
+
+  .app-topbar__title,
+  .app-topbar__user-name,
+  .app-topbar__logout .p-button-label {
+    white-space: nowrap;
+  }
+
+  /* There is a FOURTH flex-nowrap header family, `.week-nav` on the promo board. Its rule lives in
+     featured-promo-list.component.scss, not here: that component sets `justify-content: center` in its
+     own stylesheet, and component styles are injected after this file, so a global override at equal
+     specificity would silently lose. Fixing any family means checking all four. */
 }
 
 .field {
@@ -40,6 +99,47 @@ body {
 }
 
 .field-error {
-  color: var(--p-red-500);
-  font-size: 0.8125rem;
+  color: var(--cms-error-color);
+  // 0.875rem is the floor for 繁體中文: CJK glyphs carry several times the stroke density of Latin at
+  // the same em size, and below 14px the strokes start merging. This is the text that explains why a
+  // save failed, so it is the last text that should be hard to read.
+  font-size: 0.875rem;
+}
+
+/* Row-action buttons (檢視 / 編輯 / 刪除, and 上移 / 下移 / 複製 on the promo board) are icon-only
+   `size="small"`, which Aura renders at 1.75rem — a 28px tap target, well under the 44px minimum.
+   The sidebar links were raised to 44px separately; these are the same class of control. */
+.p-datatable .col-actions .p-button-icon-only,
+.row__actions .p-button-icon-only {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+/* Used by the partner and course list tables for an em-dash placeholder. The class was referenced by
+   both templates but never defined, so the placeholder rendered in full body colour. */
+.muted-if-empty {
+  color: var(--p-text-muted-color);
+}
+
+/* List tables, shared by all eight list pages (each wraps its table in `.page-body { overflow-x: auto }`).
+   The two rules only make sense together.
+
+   `th` must never wrap: Chinese breaks between any two characters, and under `table-layout: auto` the
+   only columns without their own `white-space: nowrap` (`.col-pkid`, `.col-order`) were the ones the
+   browser compressed when the table outgrew its container — down to 28px, which stacked every heading
+   one glyph per line and made a 111px header row label a 47px data row. Single-line headings: 26px.
+
+   Single-line headings make the table wider than the viewport, so `.col-actions` then sticks to the
+   right edge: 檢視 / 編輯 / 刪除 are the most-used controls on these pages and must never scroll out of
+   reach. `background: inherit` takes the row's own background, so the cell stays opaque over the
+   scrolling content and still follows the row (`.editing`, striping, any future hover tint). */
+.p-datatable th {
+  white-space: nowrap;
+}
+
+.col-actions {
+  position: sticky;
+  right: 0;
+  background: inherit;
+  box-shadow: -6px 0 6px -6px rgb(0 0 0 / 25%);
 }

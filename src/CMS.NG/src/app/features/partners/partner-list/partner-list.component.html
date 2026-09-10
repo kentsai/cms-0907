@@ -1,0 +1,107 @@
+<div class="page">
+  <header class="page-header">
+    <div class="page-header__title">
+      <h1>合作夥伴 Partner</h1>
+      <span class="page-header__subtitle">課程合作夥伴／原廠</span>
+    </div>
+    <div class="page-header__actions">
+      <p-button
+        label="搜尋條件"
+        icon="pi pi-filter"
+        severity="secondary"
+        [badge]="filterBadge"
+        badgeSeverity="info"
+        class="filter-button"
+        (onClick)="openFilters()" />
+      <p-button label="新增" icon="pi pi-plus" severity="success" routerLink="/course/partners/new" />
+    </div>
+  </header>
+
+  <section class="page-body">
+    <p-table
+      [value]="items()"
+      [loading]="loading()"
+      dataKey="pkid"
+      [paginator]="true"
+      paginatorPosition="top"
+      [rows]="rows"
+      [first]="first"
+      [rowsPerPageOptions]="rowsPerPageOptions"
+      [showCurrentPageReport]="true"
+      currentPageReportTemplate="{first}–{last} 筆，共 {totalRecords} 筆"
+      [sortField]="sortField"
+      [sortOrder]="sortOrder"
+      (onSort)="onSort($event)"
+      (onPage)="onPage($event)"
+      [rowHover]="true"
+      styleClass="p-datatable-sm partner-table">
+      <ng-template #header>
+        <tr>
+          <th pSortableColumn="pkid" class="col-pkid">主代碼 <p-sortIcon field="pkid" /></th>
+          <th pSortableColumn="name">名稱 <p-sortIcon field="name" /></th>
+          <th pSortableColumn="appKey" class="col-appkey">應用程式代碼 <p-sortIcon field="appKey" /></th>
+          <th pSortableColumn="nameOnPartnerMenu">夥伴選單名稱 <p-sortIcon field="nameOnPartnerMenu" /></th>
+          <th pSortableColumn="nameOnCourseDetailPage">課程頁顯示名稱 <p-sortIcon field="nameOnCourseDetailPage" /></th>
+          <th pSortableColumn="displayOrder" class="col-order">顯示順序 <p-sortIcon field="displayOrder" /></th>
+          <th pSortableColumn="imageFilename">圖片檔名 <p-sortIcon field="imageFilename" /></th>
+          <th class="col-link">對應課程</th>
+          <th class="col-link">對應認證</th>
+          <th class="col-actions">操作</th>
+        </tr>
+      </ng-template>
+      <ng-template #body let-item>
+        <tr>
+          <td class="col-pkid">{{ item.pkid }}</td>
+          <td>{{ item.name }}</td>
+          <td class="col-appkey"><code>{{ item.appKey }}</code></td>
+          <td>{{ item.nameOnPartnerMenu }}</td>
+          <td>{{ item.nameOnCourseDetailPage }}</td>
+          <td class="col-order">{{ item.displayOrder }}</td>
+          <td class="muted-if-empty">{{ item.imageFilename || '—' }}</td>
+          <td class="col-link">
+            <p-button
+              label="查看課程"
+              icon="pi pi-book"
+              [text]="true"
+              size="small"
+              routerLink="/course/courses"
+              [queryParams]="{ partnerPkid: item.pkid }" />
+          </td>
+          <td class="col-link">
+            <p-button
+              label="查看認證"
+              icon="pi pi-verified"
+              [text]="true"
+              size="small"
+              routerLink="/course/certifications"
+              [queryParams]="{ partnerPkid: item.pkid }" />
+          </td>
+          <td class="col-actions">
+            <p-button icon="pi pi-eye" [text]="true" [rounded]="true" size="small" ariaLabel="檢視" pTooltip="檢視" tooltipPosition="top" (onClick)="view(item)" />
+            <p-button icon="pi pi-pencil" [text]="true" [rounded]="true" size="small" ariaLabel="編輯" pTooltip="編輯" tooltipPosition="top" (onClick)="edit(item)" />
+            <p-button icon="pi pi-trash" [text]="true" [rounded]="true" size="small" severity="danger" ariaLabel="刪除" pTooltip="刪除" tooltipPosition="top" (onClick)="confirmDelete(item)" />
+          </td>
+        </tr>
+      </ng-template>
+      <ng-template #emptymessage>
+        <tr>
+          <td colspan="10" class="empty">沒有符合條件的資料。</td>
+        </tr>
+      </ng-template>
+    </p-table>
+  </section>
+</div>
+
+<p-drawer [visible]="filterVisible()" (visibleChange)="filterVisible.set($event)" position="right" header="搜尋條件" styleClass="filter-drawer">
+  <form class="filter-form" (ngSubmit)="search()">
+    <div class="field">
+      <label for="f-keyword">關鍵字</label>
+      <input id="f-keyword" pInputText name="keyword" [(ngModel)]="filters.keyword" placeholder="名稱、應用程式代碼、選單名稱、課程頁名稱" autocomplete="off" />
+    </div>
+
+    <div class="filter-form__actions">
+      <p-button label="清除" icon="pi pi-times" severity="secondary" [outlined]="true" type="button" (onClick)="clearFilters()" />
+      <p-button label="查詢" icon="pi pi-search" type="submit" />
+    </div>
+  </form>
+</p-drawer>

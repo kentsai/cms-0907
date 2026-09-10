@@ -1,0 +1,50 @@
+<form id="profileForm" [formGroup]="form" (ngSubmit)="save()" novalidate>
+  <p-toolbar styleClass="page-toolbar">
+    <ng-template #start>
+      <div class="toolbar-title">
+        <h1>個人資料 My Profile</h1>
+      </div>
+    </ng-template>
+    <ng-template #end>
+      <div class="toolbar-actions">
+        <p-button label="還原" icon="pi pi-undo" severity="secondary" type="button" (onClick)="reset()" [disabled]="!form.dirty || saving()" />
+        <p-button label="儲存" icon="pi pi-check" severity="success" type="submit" [loading]="saving()" [disabled]="form.invalid || !form.dirty || saving()" />
+      </div>
+    </ng-template>
+  </p-toolbar>
+
+  <p-card header="帳號資料" styleClass="form-card">
+    <div class="form-grid">
+      <div class="field">
+        <label for="userId">帳號 UserId</label>
+        <input id="userId" pInputText [value]="auth.profile()?.userId ?? ''" readonly aria-readonly="true" />
+        <small class="hint">帳號不可修改</small>
+      </div>
+
+      <div class="field">
+        <label for="userName">姓名 UserName <span class="required">*</span></label>
+        <input id="userName" pInputText formControlName="userName" maxlength="200" placeholder="請輸入姓名" autocomplete="name" />
+        @if (userNameInvalid) {
+          <small class="error">請輸入姓名（最多 200 字）</small>
+        }
+      </div>
+
+      <div class="field">
+        <label>角色 Roles</label>
+        <div class="roles" data-testid="roles" aria-readonly="true">
+          @for (role of auth.roles(); track role) {
+            <p-tag [value]="role" severity="info" />
+          } @empty {
+            <span class="hint">（無角色）</span>
+          }
+        </div>
+        <small class="hint">角色由系統管理員指派，無法在此修改</small>
+      </div>
+    </div>
+  </p-card>
+</form>
+
+<!-- Shared with the standalone /change-password page; a success ends the session and returns to /login. -->
+<p-card header="變更密碼 Change Password" styleClass="form-card">
+  <app-change-password-form />
+</p-card>

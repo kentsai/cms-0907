@@ -1,0 +1,51 @@
+<p-toolbar styleClass="page-toolbar">
+  <ng-template #start>
+    <div class="toolbar-title">
+      <h1>認證</h1>
+      @if (item(); as it) {
+        <span class="toolbar-title__sub">{{ it.pkid }}　{{ it.partnerName }}　{{ label(it) }}</span>
+        <app-row-audit-badge tableName="Certification" [pkid]="it.pkid" />
+      }
+    </div>
+  </ng-template>
+  <ng-template #end>
+    <div class="toolbar-actions">
+      <p-button label="返回" icon="pi pi-arrow-left" severity="secondary" [outlined]="true" (onClick)="back()" />
+      <p-button label="編輯" icon="pi pi-pencil" [disabled]="!item()" (onClick)="edit()" />
+      <p-button label="刪除" icon="pi pi-trash" severity="danger" [outlined]="true" [disabled]="!item()" (onClick)="confirmDelete()" />
+    </div>
+  </ng-template>
+</p-toolbar>
+
+@if (loading()) {
+  <p class="state">載入中…</p>
+} @else if (notFound()) {
+  <p-card>
+    <p class="state">找不到主代碼 {{ pkid }} 的認證。</p>
+  </p-card>
+} @else if (item(); as it) {
+  <p-card header="基本資料" styleClass="detail-card">
+    <dl class="detail-grid">
+      <dt>主代碼</dt>
+      <dd>{{ it.pkid }}</dd>
+
+      <dt>原廠</dt>
+      <dd>
+        <a [routerLink]="['/course/partners', it.partnerPkid]" class="fk-link">{{ it.partnerName }}</a>
+      </dd>
+
+      <dt>認證名稱</dt>
+      <dd>{{ it.title || '—' }}</dd>
+    </dl>
+  </p-card>
+
+  <p-card header="課程與職務類別" styleClass="detail-card">
+    <dl class="detail-grid">
+      <dt>對應課程</dt>
+      <dd>{{ courseLabels().length ? courseLabels().join('、') : '—' }}</dd>
+
+      <dt>職務類別</dt>
+      <dd>{{ jobCategoryLabels().length ? jobCategoryLabels().join('、') : '—' }}</dd>
+    </dl>
+  </p-card>
+}

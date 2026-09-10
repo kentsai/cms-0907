@@ -40,3 +40,7 @@ appsettings.Local.json
 
 # Personal Claude Code permissions, not shared with the team
 .claude/settings.local.json
+
+# Claude Code local artifacts
+.claude/worktrees/
+.claude/*.txt

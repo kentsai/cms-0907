@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  web.config for the API site (IIS site "CMS.API", physical path C:\VHome\CMS\API).
+
+  `dotnet publish` generates a web.config of its own; deploy.ps1 OVERWRITES it with this one
+  after stamping {{ASPNETCORE_ENVIRONMENT}} and {{CONNECTION_STRING}}. That is the only way to
+  inject the <environmentVariables> block without editing the CMS source tree.
+
+  Requires on the IIS server: the ASP.NET Core 9 Hosting Bundle (AspNetCoreModuleV2).
+-->
+<configuration>
+  <location path="." inheritInChildApplications="false">
+    <system.webServer>
+      <handlers>
+        <add name="aspNetCore" path="*" verb="*" modules="AspNetCoreModuleV2" resourceType="Unspecified" />
+      </handlers>
+
+      <aspNetCore processPath="dotnet"
+                  arguments=".\CMS.API.dll"
+                  stdoutLogEnabled="true"
+                  stdoutLogFile=".\logs\stdout"
+                  hostingModel="inprocess">
+        <environmentVariables>
+          <!-- Stamped from $aspnetEnv in deploy.ps1: "Production".
+               Swagger is Development-only by design (Program.cs registers UseSwagger()/UseSwaggerUI()
+               inside IsDevelopment()), so a deployed site never publishes the API map. Nothing else
+               in this repo keys off the environment: there is no HTTPS redirection and the CORS
+               policy is unconditional. Do not stamp "Development" here to get Swagger back on a
+               server — smoke-test with GET /api/publish-statuses instead (401 without a token). -->
+          <environmentVariable name="ASPNETCORE_ENVIRONMENT" value="{{ASPNETCORE_ENVIRONMENT}}" />
+
+          <!-- The key is CMS, not DefaultConnection — SqlConnectionFactory does
+               configuration.GetConnectionString("CMS"). Double underscore = the ':' separator. -->
+          <environmentVariable name="ConnectionStrings__CMS" value="{{CONNECTION_STRING}}" />
+        </environmentVariables>
+      </aspNetCore>
+    </system.webServer>
+  </location>
+
+  <!-- Deliberately OUTSIDE the <location> block above.
+       That block carries inheritInChildApplications="false", which is the ASP.NET Core convention for keeping
+       the handler and aspNetCore settings from leaking into child applications. Header configuration must not
+       live there: with inheritance switched off, <remove name="X-Powered-By" /> has no inherited collection to
+       act on, so the server-level header survives — and IIS can emit it with an EMPTY value, which is exactly
+       the leftover slot this arrangement produces.
+
+       <clear /> rather than <remove>: it drops the whole inherited customHeaders collection in one step, so
+       nothing from applicationHost.config can survive by name. This site adds no headers of its own — the app
+       sets them in process (Infrastructure\SecurityHeadersMiddleware) and Kestrel's Server header is off in
+       Program.cs — so an empty collection is exactly right here. -->
+  <system.webServer>
+    <httpProtocol>
+      <customHeaders>
+        <clear />
+      </customHeaders>
+    </httpProtocol>
+
+    <!-- No "Server: Microsoft-IIS/10.0" advertisement (IIS 10 1709+). Site level, not inside <location>. -->
+    <security>
+      <requestFiltering removeServerHeader="true" />
+    </security>
+  </system.webServer>
+</configuration>

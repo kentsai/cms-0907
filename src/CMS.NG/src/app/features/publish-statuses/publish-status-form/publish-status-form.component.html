@@ -1,0 +1,70 @@
+<form [formGroup]="form" (ngSubmit)="save()" novalidate>
+  <p-toolbar styleClass="page-toolbar">
+    <ng-template #start>
+      <div class="toolbar-title">
+        <h1>{{ title }}</h1>
+        @if (isEdit && pkid !== null) {
+          <app-row-audit-badge tableName="PublishStatus" [pkid]="pkid" />
+        }
+      </div>
+    </ng-template>
+    <ng-template #end>
+      <div class="toolbar-actions">
+        <p-button label="取消" icon="pi pi-times" severity="secondary" type="button" (onClick)="cancel()" />
+        <p-button label="儲存" icon="pi pi-check" severity="success" type="submit" [loading]="saving()" [disabled]="form.invalid || saving() || loading()" />
+      </div>
+    </ng-template>
+  </p-toolbar>
+
+  <p-card header="狀態資料" styleClass="form-card">
+    <div class="form-grid">
+      <div class="field">
+        <label for="pkid">主代碼 <span class="required">*</span></label>
+        <p-inputnumber
+          inputId="pkid"
+          formControlName="pkid"
+          [min]="0"
+          [max]="255"
+          [useGrouping]="false"
+          [showButtons]="true"
+          placeholder="0–255"
+          styleClass="w-full"
+          [class.ng-invalid]="isInvalid('pkid')" />
+        @if (isInvalid('pkid')) {
+          <small class="error">
+            @if (form.controls.pkid.hasError('duplicate')) {
+              主代碼已存在
+            } @else {
+              請輸入 0–255 的主代碼
+            }
+          </small>
+        } @else if (isEdit) {
+          <small class="hint">主代碼建立後不可修改</small>
+        }
+      </div>
+
+      <div class="field">
+        <label for="description">狀態說明 <span class="required">*</span></label>
+        <input id="description" pInputText formControlName="description" maxlength="50" placeholder="請輸入狀態說明" autocomplete="off" />
+        @if (isInvalid('description')) {
+          <small class="error">請輸入狀態說明（最多 50 字）</small>
+        }
+      </div>
+
+      <div class="field field--checks">
+        <p-checkbox inputId="isDraft" formControlName="isDraft" [binary]="true" />
+        <label for="isDraft">草稿</label>
+      </div>
+
+      <div class="field field--checks">
+        <p-checkbox inputId="isPublished" formControlName="isPublished" [binary]="true" />
+        <label for="isPublished">已發布</label>
+      </div>
+
+      <div class="field field--checks">
+        <p-checkbox inputId="isDiscontinued" formControlName="isDiscontinued" [binary]="true" />
+        <label for="isDiscontinued">已下架</label>
+      </div>
+    </div>
+  </p-card>
+</form>

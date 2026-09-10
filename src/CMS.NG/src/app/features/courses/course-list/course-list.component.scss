@@ -1,0 +1,189 @@
+:host {
+  display: block;
+}
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  background: var(--p-content-background);
+  border: 1px solid var(--p-content-border-color);
+  border-radius: var(--p-border-radius-lg, 8px);
+
+  &__title {
+    display: flex;
+    align-items: baseline;
+    gap: 1rem;
+
+    h1 {
+      margin: 0;
+      font-size: 1.25rem;
+      font-weight: 600;
+    }
+  }
+
+  &__subtitle {
+    color: var(--p-text-muted-color);
+  }
+
+  &__actions {
+    display: flex;
+    gap: 0.75rem;
+  }
+}
+
+.page-body {
+  background: var(--p-content-background);
+  border: 1px solid var(--p-content-border-color);
+  border-radius: var(--p-border-radius-lg, 8px);
+  overflow-x: auto;
+}
+
+.col-pkid {
+  width: 5.5rem;
+}
+
+.col-order {
+  width: 6rem;
+  text-align: right;
+}
+
+.col-code {
+  white-space: nowrap;
+}
+
+.col-title {
+  min-width: 14rem;
+}
+
+.col-date {
+  width: 7.5rem;
+  white-space: nowrap;
+}
+
+.col-num {
+  width: 6rem;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.col-bool {
+  width: 6rem;
+  text-align: center;
+}
+
+.col-actions {
+  width: 9rem;
+  text-align: center;
+  white-space: nowrap;
+}
+
+code {
+  font-size: 0.875em;
+}
+
+.empty {
+  text-align: center;
+  color: var(--p-text-muted-color);
+  padding: 2rem 0;
+}
+
+.filter-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+
+    label {
+      font-weight: 600;
+      font-size: 0.875rem;
+    }
+
+    input {
+      width: 100%;
+    }
+  }
+
+  .range {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+
+    &__sep {
+      color: var(--p-text-muted-color);
+    }
+  }
+
+  &__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+  }
+}
+
+::ng-deep .filter-drawer .w-full,
+::ng-deep .filter-drawer .w-full input {
+  width: 100%;
+}
+
+// ---- In-place cell editing (double-click a cell) ----------------------------------------------
+
+.editable {
+  cursor: cell;
+
+  &:hover:not(.editing) {
+    box-shadow: inset 0 0 0 1px var(--p-primary-color);
+  }
+}
+
+.editing {
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+  vertical-align: top;
+}
+
+.col-status {
+  min-width: 9rem;
+}
+
+::ng-deep .course-table {
+  .cell-input,
+  .cell-input input {
+    width: 100%;
+    min-width: 5rem;
+  }
+
+  .col-num .cell-input,
+  .col-num .cell-input input {
+    text-align: right;
+  }
+
+  .cell-invalid,
+  .cell-invalid input,
+  .cell-invalid.p-select,
+  .cell-invalid .p-datepicker-input {
+    border-color: var(--p-red-500, #ef4444);
+  }
+}
+
+.cell-error {
+  display: block;
+  margin-top: 0.25rem;
+  color: var(--cms-error-color, #dc2626);
+  font-size: 0.75rem;
+  white-space: normal;
+  text-align: left;
+}

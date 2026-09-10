@@ -1,0 +1,308 @@
+<div class="page">
+  <header class="page-header">
+    <div class="page-header__title">
+      <h1>課程 Course</h1>
+      <span class="page-header__subtitle">訓練課程主檔</span>
+    </div>
+    <div class="page-header__actions">
+      <p-button
+        label="搜尋條件"
+        icon="pi pi-filter"
+        severity="secondary"
+        [badge]="filterBadge"
+        badgeSeverity="info"
+        class="filter-button"
+        (onClick)="openFilters()" />
+      <p-button label="新增" icon="pi pi-plus" severity="success" routerLink="/course/courses/new" />
+    </div>
+  </header>
+
+  <section class="page-body">
+    <p-table
+      [value]="items()"
+      [loading]="loading()"
+      dataKey="pkid"
+      [paginator]="true"
+      paginatorPosition="top"
+      [rows]="rows"
+      [first]="first"
+      [rowsPerPageOptions]="rowsPerPageOptions"
+      [showCurrentPageReport]="true"
+      currentPageReportTemplate="{first}–{last} 筆，共 {totalRecords} 筆"
+      [sortField]="sortField"
+      [sortOrder]="sortOrder"
+      (onSort)="onSort($event)"
+      (onPage)="onPage($event)"
+      [rowHover]="true"
+      styleClass="p-datatable-sm course-table">
+      <ng-template #header>
+        <tr>
+          <th pSortableColumn="pkid" class="col-pkid">主代碼 <p-sortIcon field="pkid" /></th>
+          <th pSortableColumn="displayOrder" class="col-order">顯示順序 <p-sortIcon field="displayOrder" /></th>
+          <th pSortableColumn="courseId" class="col-code">簡介代碼 <p-sortIcon field="courseId" /></th>
+          <th pSortableColumn="prodCourseId" class="col-code">科目代碼 <p-sortIcon field="prodCourseId" /></th>
+          <th pSortableColumn="title" class="col-title">課程名稱 <p-sortIcon field="title" /></th>
+          <th pSortableColumn="partnerName">原廠 <p-sortIcon field="partnerName" /></th>
+          <th pSortableColumn="courseGroupDescription">課程群組 <p-sortIcon field="courseGroupDescription" /></th>
+          <th pSortableColumn="publishStatusDescription">上架狀態 <p-sortIcon field="publishStatusDescription" /></th>
+          <th pSortableColumn="scheduleOn" class="col-date">上架日期 <p-sortIcon field="scheduleOn" /></th>
+          <th pSortableColumn="scheduleOff" class="col-date">下架日期 <p-sortIcon field="scheduleOff" /></th>
+          <th pSortableColumn="hour" class="col-num">時數 <p-sortIcon field="hour" /></th>
+          <th pSortableColumn="listPrice" class="col-num">定價 <p-sortIcon field="listPrice" /></th>
+          <th pSortableColumn="learningCredit" class="col-num">點數 <p-sortIcon field="learningCredit" /></th>
+          <th pSortableColumn="canRepeat" class="col-bool">允許重聽 <p-sortIcon field="canRepeat" /></th>
+          <th class="col-actions">操作</th>
+        </tr>
+      </ng-template>
+      <ng-template #body let-item>
+        <tr>
+          <!-- Read-only: primary key -->
+          <td class="col-pkid" data-field="pkid">{{ item.pkid }}</td>
+
+          <td class="col-order editable" data-field="displayOrder"
+              [class.editing]="editorFor(item, 'displayOrder')"
+              (dblclick)="startEdit(item, 'displayOrder')" (keydown.escape)="cancelEdit()">
+            @if (editorFor(item, 'displayOrder'); as e) {
+              <p-inputnumber [(ngModel)]="e.value" [useGrouping]="false" [pAutoFocus]="true"
+                             inputStyleClass="cell-input" [class.cell-invalid]="!!e.error"
+                             (onBlur)="commit()" (keydown.enter)="commit()" />
+              @if (e.error) { <small class="cell-error">{{ e.error }}</small> }
+            } @else {
+              {{ item.displayOrder }}
+            }
+          </td>
+
+          <td class="col-code editable" data-field="courseId"
+              [class.editing]="editorFor(item, 'courseId')"
+              (dblclick)="startEdit(item, 'courseId')" (keydown.escape)="cancelEdit()">
+            @if (editorFor(item, 'courseId'); as e) {
+              <input pInputText class="cell-input" [(ngModel)]="e.value" maxlength="50" autocomplete="off"
+                     [pAutoFocus]="true" [class.cell-invalid]="!!e.error"
+                     (blur)="commit()" (keydown.enter)="commit()" />
+              @if (e.error) { <small class="cell-error">{{ e.error }}</small> }
+            } @else {
+              <code>{{ item.courseId }}</code>
+            }
+          </td>
+
+          <td class="col-code editable" data-field="prodCourseId"
+              [class.editing]="editorFor(item, 'prodCourseId')"
+              (dblclick)="startEdit(item, 'prodCourseId')" (keydown.escape)="cancelEdit()">
+            @if (editorFor(item, 'prodCourseId'); as e) {
+              <input pInputText class="cell-input" [(ngModel)]="e.value" maxlength="50" autocomplete="off"
+                     [pAutoFocus]="true" [class.cell-invalid]="!!e.error"
+                     (blur)="commit()" (keydown.enter)="commit()" />
+              @if (e.error) { <small class="cell-error">{{ e.error }}</small> }
+            } @else {
+              <code>{{ item.prodCourseId }}</code>
+            }
+          </td>
+
+          <td class="col-title editable" data-field="title"
+              [class.editing]="editorFor(item, 'title')"
+              (dblclick)="startEdit(item, 'title')" (keydown.escape)="cancelEdit()">
+            @if (editorFor(item, 'title'); as e) {
+              <input pInputText class="cell-input" [(ngModel)]="e.value" maxlength="200" autocomplete="off"
+                     [pAutoFocus]="true" [class.cell-invalid]="!!e.error"
+                     (blur)="commit()" (keydown.enter)="commit()" />
+              @if (e.error) { <small class="cell-error">{{ e.error }}</small> }
+            } @else {
+              {{ item.title }}
+            }
+          </td>
+
+          <!-- Read-only: FK lookup labels -->
+          <td data-field="partnerName">{{ item.partnerName }}</td>
+          <td class="muted-if-empty" data-field="courseGroupDescription">{{ item.courseGroupDescription || '—' }}</td>
+
+          <td class="col-status editable" data-field="publishStatusPkid"
+              [class.editing]="editorFor(item, 'publishStatusPkid')"
+              (dblclick)="startEdit(item, 'publishStatusPkid')" (keydown.escape)="cancelEdit()">
+            @if (editorFor(item, 'publishStatusPkid'); as e) {
+              <p-select #statusEditor [(ngModel)]="e.value" [options]="publishStatuses()" optionLabel="label" optionValue="pkid"
+                        appendTo="body" styleClass="cell-input" [autofocus]="true" [class.cell-invalid]="!!e.error"
+                        (onChange)="commit()" (onBlur)="!statusEditor.overlayVisible && commit()" />
+              @if (e.error) { <small class="cell-error">{{ e.error }}</small> }
+            } @else {
+              {{ item.publishStatusDescription }}
+            }
+          </td>
+
+          <td class="col-date editable" data-field="scheduleOn"
+              [class.editing]="editorFor(item, 'scheduleOn')"
+              (dblclick)="startEdit(item, 'scheduleOn')" (keydown.escape)="cancelEdit()">
+            @if (editorFor(item, 'scheduleOn'); as e) {
+              <p-datepicker #onEditor [(ngModel)]="e.value" dateFormat="yy-mm-dd" appendTo="body" styleClass="cell-input"
+                            [autofocus]="true" [class.cell-invalid]="!!e.error"
+                            (onSelect)="commit()" (onClose)="commit()" (onBlur)="!onEditor.overlayVisible && commit()" />
+              @if (e.error) { <small class="cell-error">{{ e.error }}</small> }
+            } @else {
+              {{ item.scheduleOn }}
+            }
+          </td>
+
+          <td class="col-date editable" data-field="scheduleOff"
+              [class.editing]="editorFor(item, 'scheduleOff')"
+              (dblclick)="startEdit(item, 'scheduleOff')" (keydown.escape)="cancelEdit()">
+            @if (editorFor(item, 'scheduleOff'); as e) {
+              <p-datepicker #offEditor [(ngModel)]="e.value" dateFormat="yy-mm-dd" appendTo="body" styleClass="cell-input"
+                            [autofocus]="true" [class.cell-invalid]="!!e.error"
+                            (onSelect)="commit()" (onClose)="commit()" (onBlur)="!offEditor.overlayVisible && commit()" />
+              @if (e.error) { <small class="cell-error">{{ e.error }}</small> }
+            } @else {
+              {{ item.scheduleOff }}
+            }
+          </td>
+
+          <td class="col-num editable" data-field="hour"
+              [class.editing]="editorFor(item, 'hour')"
+              (dblclick)="startEdit(item, 'hour')" (keydown.escape)="cancelEdit()">
+            @if (editorFor(item, 'hour'); as e) {
+              <p-inputnumber [(ngModel)]="e.value" [useGrouping]="false" [pAutoFocus]="true"
+                             inputStyleClass="cell-input" [class.cell-invalid]="!!e.error"
+                             (onBlur)="commit()" (keydown.enter)="commit()" />
+              @if (e.error) { <small class="cell-error">{{ e.error }}</small> }
+            } @else {
+              {{ item.hour }}
+            }
+          </td>
+
+          <td class="col-num editable" data-field="listPrice"
+              [class.editing]="editorFor(item, 'listPrice')"
+              (dblclick)="startEdit(item, 'listPrice')" (keydown.escape)="cancelEdit()">
+            @if (editorFor(item, 'listPrice'); as e) {
+              <p-inputnumber [(ngModel)]="e.value" mode="decimal" [minFractionDigits]="0" [maxFractionDigits]="0"
+                             [pAutoFocus]="true" inputStyleClass="cell-input" [class.cell-invalid]="!!e.error"
+                             (onBlur)="commit()" (keydown.enter)="commit()" />
+              @if (e.error) { <small class="cell-error">{{ e.error }}</small> }
+            } @else {
+              {{ item.listPrice | number:'1.0-0' }}
+            }
+          </td>
+
+          <td class="col-num editable" data-field="learningCredit"
+              [class.editing]="editorFor(item, 'learningCredit')"
+              (dblclick)="startEdit(item, 'learningCredit')" (keydown.escape)="cancelEdit()">
+            @if (editorFor(item, 'learningCredit'); as e) {
+              <p-inputnumber [(ngModel)]="e.value" mode="decimal" [minFractionDigits]="1" [maxFractionDigits]="1" [useGrouping]="false"
+                             [pAutoFocus]="true" inputStyleClass="cell-input" [class.cell-invalid]="!!e.error"
+                             (onBlur)="commit()" (keydown.enter)="commit()" />
+              @if (e.error) { <small class="cell-error">{{ e.error }}</small> }
+            } @else {
+              {{ item.learningCredit | number:'1.1-1' }}
+            }
+          </td>
+
+          <td class="col-bool editable" data-field="canRepeat"
+              [class.editing]="editorFor(item, 'canRepeat')"
+              (dblclick)="startEdit(item, 'canRepeat')" (keydown.escape)="cancelEdit()">
+            @if (editorFor(item, 'canRepeat'); as e) {
+              <p-checkbox [(ngModel)]="e.value" [binary]="true" [autofocus]="true"
+                          (onChange)="commit()" (onBlur)="commit()" />
+              @if (e.error) { <small class="cell-error">{{ e.error }}</small> }
+            } @else {
+              {{ item.canRepeat ? '是' : '否' }}
+            }
+          </td>
+
+          <td class="col-actions">
+            <p-button icon="pi pi-eye" [text]="true" [rounded]="true" size="small" ariaLabel="檢視" pTooltip="檢視" tooltipPosition="top" (onClick)="view(item)" />
+            <p-button icon="pi pi-pencil" [text]="true" [rounded]="true" size="small" ariaLabel="編輯" pTooltip="編輯" tooltipPosition="top" (onClick)="edit(item)" />
+            <p-button icon="pi pi-trash" [text]="true" [rounded]="true" size="small" severity="danger" ariaLabel="刪除" pTooltip="刪除" tooltipPosition="top" (onClick)="confirmDelete(item)" />
+          </td>
+        </tr>
+      </ng-template>
+      <ng-template #emptymessage>
+        <tr>
+          <td colspan="15" class="empty">沒有符合條件的資料。</td>
+        </tr>
+      </ng-template>
+    </p-table>
+  </section>
+</div>
+
+<p-drawer [visible]="filterVisible()" (visibleChange)="filterVisible.set($event)" position="right" header="搜尋條件" styleClass="filter-drawer">
+  <form class="filter-form" (ngSubmit)="search()">
+    <div class="field">
+      <label for="f-keyword">關鍵字</label>
+      <input id="f-keyword" pInputText name="keyword" [(ngModel)]="filters.keyword" placeholder="課程名稱、官方名稱、簡介代碼、科目代碼、友善網址" autocomplete="off" />
+    </div>
+
+    <div class="field">
+      <label for="f-partner">原廠</label>
+      <p-select
+        inputId="f-partner"
+        name="partnerPkid"
+        [(ngModel)]="filters.partnerPkid"
+        [options]="partners()"
+        optionLabel="label"
+        optionValue="pkid"
+        [filter]="true"
+        filterBy="label"
+        [showClear]="true"
+        placeholder="全部"
+        appendTo="body"
+        styleClass="w-full" />
+    </div>
+
+    <div class="field">
+      <label for="f-courseGroup">課程群組</label>
+      <p-select
+        inputId="f-courseGroup"
+        name="courseGroupPkid"
+        [(ngModel)]="filters.courseGroupPkid"
+        [options]="courseGroups()"
+        optionLabel="label"
+        optionValue="pkid"
+        [filter]="true"
+        filterBy="label"
+        [showClear]="true"
+        placeholder="全部"
+        appendTo="body"
+        styleClass="w-full" />
+    </div>
+
+    <div class="field">
+      <label for="f-publishStatus">上架狀態</label>
+      <p-select
+        inputId="f-publishStatus"
+        name="publishStatusPkid"
+        [(ngModel)]="filters.publishStatusPkid"
+        [options]="publishStatuses()"
+        optionLabel="label"
+        optionValue="pkid"
+        [showClear]="true"
+        placeholder="全部"
+        appendTo="body"
+        styleClass="w-full" />
+    </div>
+
+    <div class="field">
+      <label>上架日期</label>
+      <div class="range">
+        <p-datepicker inputId="f-scheduleOnFrom" name="scheduleOnFrom" [(ngModel)]="dateFilters.scheduleOnFrom" dateFormat="yy-mm-dd" [showIcon]="true" [showClear]="true" placeholder="起" appendTo="body" styleClass="w-full" />
+        <span class="range__sep">～</span>
+        <p-datepicker inputId="f-scheduleOnTo" name="scheduleOnTo" [(ngModel)]="dateFilters.scheduleOnTo" dateFormat="yy-mm-dd" [showIcon]="true" [showClear]="true" placeholder="迄" appendTo="body" styleClass="w-full" />
+      </div>
+    </div>
+
+    <div class="field">
+      <label>下架日期</label>
+      <div class="range">
+        <p-datepicker inputId="f-scheduleOffFrom" name="scheduleOffFrom" [(ngModel)]="dateFilters.scheduleOffFrom" dateFormat="yy-mm-dd" [showIcon]="true" [showClear]="true" placeholder="起" appendTo="body" styleClass="w-full" />
+        <span class="range__sep">～</span>
+        <p-datepicker inputId="f-scheduleOffTo" name="scheduleOffTo" [(ngModel)]="dateFilters.scheduleOffTo" dateFormat="yy-mm-dd" [showIcon]="true" [showClear]="true" placeholder="迄" appendTo="body" styleClass="w-full" />
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="f-canRepeat">允許重聽</label>
+      <p-select inputId="f-canRepeat" name="canRepeat" [(ngModel)]="filters.canRepeat" [options]="boolOptions" optionLabel="label" optionValue="value" appendTo="body" styleClass="w-full" />
+    </div>
+
+    <div class="filter-form__actions">
+      <p-button label="清除" icon="pi pi-times" severity="secondary" [outlined]="true" type="button" (onClick)="clearFilters()" />
+      <p-button label="查詢" icon="pi pi-search" type="submit" />
+    </div>
+  </form>
+</p-drawer>

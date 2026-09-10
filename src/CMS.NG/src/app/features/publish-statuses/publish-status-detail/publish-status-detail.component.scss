@@ -1,0 +1,60 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+::ng-deep .page-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+
+.toolbar-title {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+
+  h1 {
+    margin: 0;
+    font-size: 1.125rem;
+    font-weight: 600;
+  }
+
+  &__sub {
+    color: var(--p-text-muted-color);
+  }
+}
+
+.toolbar-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: 8rem 1fr;
+  row-gap: 0.75rem;
+  column-gap: 1rem;
+  margin: 0;
+
+  dt {
+    font-weight: 600;
+    color: var(--p-text-muted-color);
+  }
+
+  dd {
+    margin: 0;
+  }
+}
+
+.related-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.state {
+  color: var(--p-text-muted-color);
+  margin: 0;
+}

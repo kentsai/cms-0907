@@ -1,0 +1,46 @@
+<form [formGroup]="form" (ngSubmit)="save()" class="inline-form" novalidate>
+  <div class="inline-form__title">{{ isEdit ? '編輯版位' : '新增版位' }} {{ slot() }}</div>
+
+  <div class="field">
+    <label for="promotion">促銷代碼 PromoCode <span class="required">*</span></label>
+    <p-autocomplete
+      inputId="promotion"
+      formControlName="promotion"
+      [suggestions]="suggestions()"
+      (completeMethod)="search($event)"
+      (onSelect)="onPromotionSelected($event)"
+      optionLabel="promoCode"
+      [forceSelection]="true"
+      [dropdown]="true"
+      [minLength]="1"
+      placeholder="輸入 PromoCode 搜尋"
+      appendTo="body"
+      styleClass="w-full" />
+    @if (isInvalid('promotion')) {
+      <small class="error">請從清單選擇促銷代碼</small>
+    } @else {
+      <small class="hint">選擇後會帶入促銷的主題與說明（僅在欄位空白時）</small>
+    }
+  </div>
+
+  <div class="field">
+    <label for="topic">主題 Topic <span class="required">*</span></label>
+    <input id="topic" pInputText formControlName="topic" maxlength="100" autocomplete="off" />
+    @if (isInvalid('topic')) {
+      <small class="error">請輸入主題（最多 100 字）</small>
+    }
+  </div>
+
+  <div class="field">
+    <label for="description">說明 Description <span class="required">*</span></label>
+    <input id="description" pInputText formControlName="description" maxlength="300" autocomplete="off" />
+    @if (isInvalid('description')) {
+      <small class="error">請輸入說明（最多 300 字）</small>
+    }
+  </div>
+
+  <div class="inline-form__actions">
+    <p-button label="儲存" icon="pi pi-check" severity="success" size="small" type="submit" [loading]="saving()" [disabled]="form.invalid || saving()" />
+    <p-button label="取消" icon="pi pi-times" severity="secondary" size="small" [outlined]="true" type="button" (onClick)="cancel()" />
+  </div>
+</form>
