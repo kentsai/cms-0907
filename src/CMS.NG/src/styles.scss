@@ -21,12 +21,15 @@ body {
   box-sizing: border-box;
 }
 
+// No `margin-bottom` here on purpose. All eight list pages nest this inside `.page`, which is a
+// `flex-direction: column` with `gap: 1rem`, and each of them re-declares `.page-header` in its own scoped
+// stylesheet without resetting margin — so the global margin survived on top of the gap and every list page
+// rendered a measured 32px between the header card and the table where 16px was intended.
 .page-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  margin-bottom: 1rem;
 }
 
 .page-title {
