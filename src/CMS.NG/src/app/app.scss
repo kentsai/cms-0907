@@ -104,6 +104,15 @@
   border: none;
 }
 
+// Every sidebar link was under the 44px minimum touch target: PrimeNG gives them 4px of vertical padding,
+// so a one-line entry measured 24px, a group header 34px and a two-line entry 40px. That was tolerable
+// while the sidebar was a mouse-only desktop column; it is not now that everything below 1024px taps it as
+// an overlay. `min-height` rather than padding so the two-line entries keep their own height.
+:host ::ng-deep .app-sidebar__menu .p-panelmenu-header-link,
+:host ::ng-deep .app-sidebar__menu .p-panelmenu-item-link {
+  min-height: 44px;
+}
+
 // Narrow viewports (phones AND tablets, up to 1023px): the content takes the full width and the sidebar,
 // when open, floats over it instead of squeezing the page into a sliver. The shell starts collapsed there
 // (see `App.sidebarCollapsed`, which must keep the same 1023px value as this query).
