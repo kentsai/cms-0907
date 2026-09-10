@@ -1,6 +1,4 @@
 using System.Security.Claims;
-using System.Security.Cryptography;
-using System.Text;
 using CMS.API.Infrastructure;
 using CMS.API.Models;
 using CMS.API.Repositories;
@@ -26,7 +24,8 @@ public class AuthController(
     IAuthRepository repository,
     IJwtTokenIssuer tokenIssuer,
     TimeProvider timeProvider,
-    IPasswordStampCache passwordStamps) : ControllerBase
+    IPasswordStampCache passwordStamps,
+    ILogger<AuthController> logger) : ControllerBase
 {
     public const string InvalidCredentialsMessage = "帳號或密碼錯誤。";
     public const string UserNameRequiredMessage = "請輸入姓名。";
@@ -45,9 +44,16 @@ public class AuthController(
     public async Task<ActionResult<LoginResponse>> Login([FromBody] LoginRequest request, CancellationToken cancellationToken)
     {
         var user = await repository.GetCredentialAsync(request.UserId, cancellationToken);
-        if (user is null || !CredentialsMatch(user, request))
+        if (user is null || !CredentialsMatch(user, request, out var needsHashUpgrade))
         {
             return Unauthorized(new { message = InvalidCredentialsMessage });
+        }
+
+        // The plaintext is verified and in hand exactly once per sign-in, which is the only moment a legacy row can
+        // be re-hashed without asking the user for anything. Best-effort: a failure here must not fail the login.
+        if (needsHashUpgrade)
+        {
+            await UpgradeStoredPasswordHashAsync(user.UserId, request.Password, cancellationToken);
         }
 
         try
@@ -147,7 +153,7 @@ public class AuthController(
             return NotFound();
         }
 
-        if (!PasswordMatches(user, request.CurrentPassword))
+        if (!PasswordMatches(user, request.CurrentPassword, out _))
         {
             return FieldError(nameof(request.CurrentPassword), CurrentPasswordIncorrectMessage);
         }
@@ -168,7 +174,7 @@ public class AuthController(
         }
 
         var updated = await repository.UpdatePasswordAsync(
-            userId, PasswordHasher.Sha256Hex(request.NewPassword), timeProvider.GetUtcNow().UtcDateTime, cancellationToken);
+            userId, PasswordHasher.Hash(request.NewPassword), timeProvider.GetUtcNow().UtcDateTime, cancellationToken);
         if (!updated)
         {
             return NotFound();
@@ -190,20 +196,42 @@ public class AuthController(
         User.FindFirst(JwtTokenIssuer.UserIdClaim)?.Value ?? User.Identity?.Name;
 
     /// <summary>
-    /// UserId must match exactly (ordinal — the DB lookup may be collation-insensitive), the user must be active,
-    /// and the stored hash must equal SHA-256(password).
+    /// Rewrites a legacy password hash in the current format, using the plaintext this request just verified.
+    /// Swallows everything but cancellation: the credentials are already proven, so a storage-migration failure
+    /// must not turn a valid sign-in into an error. The row is simply picked up again on the next login.
     /// </summary>
-    private static bool CredentialsMatch(AppUserCredential user, LoginRequest request)
+    private async Task UpgradeStoredPasswordHashAsync(string userId, string password, CancellationToken cancellationToken)
     {
-        var userIdMatches = string.Equals(user.UserId, request.UserId, StringComparison.Ordinal);
-        return userIdMatches & user.IsActive & PasswordMatches(user, request.Password);
+        try
+        {
+            await repository.UpgradePasswordHashAsync(userId, PasswordHasher.Hash(password), cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogError(ex, "無法將使用者 {UserId} 的密碼雜湊升級為新格式，本次登入不受影響。", userId);
+        }
     }
 
-    /// <summary>SHA-256(password) against the stored hash: constant-time and hex-case-insensitive.</summary>
-    private static bool PasswordMatches(AppUserCredential user, string password)
+    /// <summary>
+    /// UserId must match exactly (ordinal — the DB lookup may be collation-insensitive), the user must be active,
+    /// and the password must verify against the stored hash.
+    /// </summary>
+    private static bool CredentialsMatch(AppUserCredential user, LoginRequest request, out bool needsHashUpgrade)
     {
-        var expected = Encoding.UTF8.GetBytes(PasswordHasher.Sha256Hex(password));
-        var actual = Encoding.UTF8.GetBytes((user.PasswordHash ?? string.Empty).Trim().ToLowerInvariant());
-        return expected.Length == actual.Length && CryptographicOperations.FixedTimeEquals(expected, actual);
+        var userIdMatches = string.Equals(user.UserId, request.UserId, StringComparison.Ordinal);
+        // Non-short-circuiting on purpose: every rejected login does the same work, whichever check failed.
+        var passwordMatches = PasswordMatches(user, request.Password, out needsHashUpgrade);
+        var accepted = userIdMatches & user.IsActive & passwordMatches;
+
+        // Only re-hash for a login that is actually being accepted.
+        needsHashUpgrade &= accepted;
+        return accepted;
     }
+
+    /// <summary>
+    /// The password against the stored hash, in whichever format the row holds (see <see cref="PasswordHasher"/>).
+    /// <paramref name="needsHashUpgrade"/> is true on a match that is still stored in the legacy unsalted format.
+    /// </summary>
+    private static bool PasswordMatches(AppUserCredential user, string password, out bool needsHashUpgrade) =>
+        PasswordHasher.Verify(password, user.PasswordHash, out needsHashUpgrade);
 }

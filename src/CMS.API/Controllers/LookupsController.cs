@@ -1,5 +1,7 @@
+using CMS.API.Infrastructure;
 using CMS.API.Models;
 using CMS.API.Repositories;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace CMS.API.Controllers;
@@ -31,14 +33,21 @@ public class LookupsController(
         return Ok(await publishStatuses.GetLookupAsync(cancellationToken));
     }
 
+    /// <summary>Administrators only: it feeds the role picker on the 系統管理 AppUser pages and lists every role.</summary>
     [HttpGet("app-roles")]
+    [Authorize(Policy = AuthorizationPolicies.Admin)]
     [ProducesResponseType<IReadOnlyList<StringLookupItem>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyList<StringLookupItem>>> AppRoles(CancellationToken cancellationToken)
     {
         return Ok(await appRoles.GetLookupAsync(cancellationToken));
     }
 
+    /// <summary>
+    /// Administrators only: it feeds the user picker on the 系統管理 AppRole pages and would otherwise let any
+    /// signed-in caller enumerate every account name and UserId.
+    /// </summary>
     [HttpGet("app-users")]
+    [Authorize(Policy = AuthorizationPolicies.Admin)]
     [ProducesResponseType<IReadOnlyList<StringLookupItem>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyList<StringLookupItem>>> AppUsers(CancellationToken cancellationToken)
     {

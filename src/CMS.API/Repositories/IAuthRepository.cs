@@ -31,11 +31,22 @@ public interface IAuthRepository
     Task<bool> UpdateUserNameAsync(string userId, string userName, CancellationToken cancellationToken);
 
     /// <summary>
-    /// Sets <c>AppUser.PasswordHash</c> (already SHA-256 hex, see <see cref="Infrastructure.PasswordHasher"/>) and
+    /// Sets <c>AppUser.PasswordHash</c> (already hashed, see <see cref="Infrastructure.PasswordHasher.Hash"/>) and
     /// <c>PasswordUpdatedTime</c> for <paramref name="userId"/> and writes the RowAudit. Returns false when no row
     /// matched. The caller (<c>AuthController</c>) has already verified the current password and the policy.
     /// </summary>
     Task<bool> UpdatePasswordAsync(string userId, string passwordHash, DateTime passwordUpdatedTime, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Rewrites <c>AppUser.PasswordHash</c> in the current storage format for a user who just signed in with a
+    /// legacy hash (see <see cref="Infrastructure.PasswordHasher.Verify"/>). Returns false when no row matched.
+    /// <para>
+    /// Deliberately touches nothing else. <c>PasswordUpdatedTime</c> stays as it was, because the password itself
+    /// did not change: moving it would revoke every live session of that user for a storage detail. No RowAudit row
+    /// is written either — the 異動紀錄 History badge shows changes a person made, and a re-encoding is not one.
+    /// </para>
+    /// </summary>
+    Task<bool> UpgradePasswordHashAsync(string userId, string passwordHash, CancellationToken cancellationToken);
 
     /// <summary>
     /// The user's <c>PasswordUpdatedTime</c> (UTC), or null when there is no such user. Read by the bearer handler

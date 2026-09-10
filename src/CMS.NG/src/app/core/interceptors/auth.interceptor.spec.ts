@@ -15,6 +15,8 @@ describe('authInterceptor', () => {
   let backend: HttpTestingController;
   let navigate: jasmine.Spy;
   let toast: jasmine.Spy;
+  /** True once a spec has called `setup()`; the pure `serverErrorDetail` specs never do. */
+  let configured = false;
 
   function setup(): void {
     TestBed.configureTestingModule({
@@ -29,12 +31,20 @@ describe('authInterceptor', () => {
     backend = TestBed.inject(HttpTestingController);
     navigate = spyOn(TestBed.inject(Router), 'navigateByUrl').and.resolveTo(true);
     toast = spyOn(TestBed.inject(MessageService), 'add');
+    configured = true;
   }
 
-  beforeEach(() => sessionStorage.clear());
+  beforeEach(() => {
+    configured = false;
+    sessionStorage.clear();
+  });
 
   afterEach(() => {
-    backend.verify();
+    // `serverErrorDetail` is a pure function, so those specs configure no TestBed and leave no backend to verify.
+    // Jasmine randomises order, so without this guard they fail whenever they happen to run first.
+    if (configured) {
+      backend.verify();
+    }
     sessionStorage.clear();
   });
 

@@ -10,11 +10,15 @@
 ## Summary
 
 The API issues **HS256 JWTs** on login and requires one on every other request. Passwords are stored as
-**SHA-256 hex** in `AppUser.PasswordHash` and never leave the server. The signing secret and the default password
-both live in the JSON of `SysConfig.configValue WHERE configKey = 'appConfig'`. Authorization is
-**authentication-only**: every action except `POST /api/auth/login` needs a valid token, and no action checks a
-role. The single role-aware behaviour is the Angular shell hiding the 系統管理 Admin menu group from users whose
-token has no `Admin` role. A password change (self-service or admin reset) invalidates every token issued
+**salted PBKDF2-HMAC-SHA256** in `AppUser.PasswordHash` and never leave the server; rows still holding the legacy
+unsalted SHA-256 hex digest keep working and are rewritten in the new format on their owner's next login. The
+signing secret and the default password both live in the JSON of
+`SysConfig.configValue WHERE configKey = 'appConfig'`. Authorization is **authentication plus one role check**:
+every action except `POST /api/auth/login` needs a valid token, and the endpoints that hand out access itself —
+`AppUsersController`, `AppRolesController` and the `app-users` / `app-roles` lookups — additionally require the
+`Admin` role (**403** otherwise). Every other endpoint is open to any authenticated user. The Angular shell hides
+the 系統管理 Admin menu group and `adminGuard` blocks its routes, but those are the user experience; the API is the
+control. A password change (self-service or admin reset) invalidates every token issued
 before it, so the user must log in again with the new password. A login made **with the default password**
 (a freshly created or admin-reset account) is accepted, but its token only opens the password change: every
 other action answers 403 until the user has set a password of their own.
@@ -26,7 +30,7 @@ other action answers 403 until the user has set a password of their own.
 | Secrets | `SysConfig.appConfig.symmetricSecurityKey` (≥ 32 UTF-8 bytes), `SysConfig.appConfig.defaultPassword` |
 | Token | HS256, issuer `CMS.API`, no audience, lifetime **24 h**, claims `sub` / `jti` / `iat` / `userId` / `userName` / `role`* / `mustChangePassword`† |
 | Session (browser) | `sessionStorage['auth-profile']` = `{ userId, userName, accessToken }`; gone when the tab closes |
-| Authorization | Global `AuthorizeFilter` (authenticated user); `[AllowAnonymous]` only on `AuthController.Login` |
+| Authorization | Global `AuthorizeFilter` (authenticated user); `[AllowAnonymous]` only on `AuthController.Login`; `[Authorize(Policy = AuthorizationPolicies.Admin)]` on `AppUsersController`, `AppRolesController` and `LookupsController.AppUsers` / `.AppRoles` |
 | Default-password lock | Global `PasswordChangeRequiredFilter`: token with `mustChangePassword` → **403** everywhere except `[AllowPasswordChangeRequired]` (`ChangePassword` only) |
 | Revocation | Token `iat` < `AppUser.PasswordUpdatedTime` (whole seconds) → 401 |
 
@@ -68,9 +72,20 @@ bilingually (Chinese rule + English gloss) under the new-password field; field-r
 
 ## Password storage & policy
 
-1. `PasswordHash` = `PasswordHasher.Sha256Hex(password)`: SHA-256 of the UTF-8 bytes, lowercase hex, 64 chars.
-   Comparison is **constant-time** (`CryptographicOperations.FixedTimeEquals`) and **hex-case-insensitive**
-   (the stored value is trimmed and lower-cased first).
+1. `PasswordHash` = `PasswordHasher.Hash(password)`: **PBKDF2-HMAC-SHA256**, 210 000 iterations, a fresh
+   16-byte random salt per call, 32 bytes of derived key, stored as the self-describing string
+   `pbkdf2-sha256$<iterations>$<base64 salt>$<base64 hash>` (90 chars). Because the salt is random the same
+   password never stores the same value twice — compare with `PasswordHasher.Verify`, never string equality.
+   Comparison is **constant-time** (`CryptographicOperations.FixedTimeEquals`).
+   **Legacy format.** Rows written before this change hold a bare unsalted SHA-256 hex digest (64 chars,
+   `PasswordHasher.Sha256Hex`, matched case-insensitively after trimming). `Verify` still accepts them and
+   returns `needsUpgrade = true`; `AuthController.Login` then calls
+   `IAuthRepository.UpgradePasswordHashAsync` with a fresh `Hash` of the plaintext it just verified. The
+   migration is silent and per-user, needs no reset, and deliberately leaves `PasswordUpdatedTime` alone (it is
+   the token-revocation stamp — moving it would sign the user out for a storage detail) and writes **no**
+   RowAudit row (the credential did not change, only its encoding). A failure there is logged and swallowed:
+   the login still succeeds and the row is retried next time. `Sha256Hex` must never be used to store a
+   password.
 2. `PasswordHash` appears in exactly one SELECT (`IAuthRepository.GetCredentialAsync`) and in no wire model:
    `LoginResponse`, `ProfileResponse`, `AppUser` and every Angular model have no hash member.
 3. Complexity (`Infrastructure\PasswordPolicy`, mirrored by `core/utils/password.validator.ts`):
@@ -90,9 +105,11 @@ bilingually (Chinese rule + English gloss) under the new-password field; field-r
 
 1. `GetCredentialAsync(userId)` loads `UserId, UserName, IsActive, PasswordHash`.
 2. The user is accepted only if **all** hold: row exists; `UserId` equals the request **ordinally** (the DB
-   collation may be case-insensitive, the API is not); `IsActive = 1`; SHA-256(password) matches the hash.
+   collation may be case-insensitive, the API is not); `IsActive = 1`; `PasswordHasher.Verify(password, hash)`
+   succeeds (either stored format).
    Every failure returns the same **401** `{ "message": "帳號或密碼錯誤。" }` — callers cannot tell which check
-   failed.
+   failed. On an **accepted** login whose row is still legacy, the hash is rewritten first (see *Password
+   storage & policy*); a rejected login never rewrites anything.
 3. On success: `GetRoleIdsAsync(userId)` (ordered by `RoleId`), `GetSymmetricSecurityKeyAsync()` (read from
    `SysConfig` **per call**, so a rotated key is used without restart), `GetDefaultPasswordAsync()` (same row),
    then `mustChangePassword = password == defaultPassword` (**ordinal**; the hash already matched, so this is
@@ -170,8 +187,18 @@ without any schema change.
 
 - `AuthController.Login` is the **only** `[AllowAnonymous]` action in the assembly; no controller carries a
   class-level `[AllowAnonymous]` (enforced by a reflection test).
-- No `[Authorize(Roles = …)]` anywhere: an authenticated user may call every endpoint, including the
-  `系統管理` CRUD (AppUser, AppRole, reset-password). Role claims are informational for the API.
+- **Admin policy.** `Program.cs` registers `AuthorizationPolicies.Admin` = `RequireRole("Admin")`.
+  `AppUsersController` and `AppRolesController` carry it at class level, and
+  `LookupsController.AppUsers` / `.AppRoles` at action level (they enumerate every account / role and feed
+  only the 系統管理 pages). A signed-in non-administrator gets **403** and the repository is never reached; a
+  missing or invalid token is still **401**, because the global `AuthorizeFilter` runs first. Reflection tests
+  pin the guarded set to exactly those two controllers and those two lookup actions.
+  Every other endpoint (all content CRUD, the remaining lookups, RowAudit, self-service profile and password)
+  needs authentication only.
+- Rationale: before this policy existed any signed-in user could create accounts, delete them, rewrite role
+  membership through `AppRoleRequest.UserIds`, and reset any administrator's password to the shared
+  `defaultPassword` and then take that account over. Hiding the menu in the shell was the only obstacle, and a
+  hidden menu is not a control.
 - Frontend: `authGuard` (`canActivateChild` on the whole app group) requires a stored token and otherwise
   redirects to `/login?returnUrl=<attempted url>`; only in-app absolute paths (`/…`, not `//…`) are honoured
   after login. When `AuthService.mustChangePassword()` is true every URL except `/change-password` (query string
@@ -210,12 +237,12 @@ and stop at the first failure; every rejection is **400** `ValidationProblem` wi
 | 0 | `userId` claim present | 401 |
 | 1 | `currentPassword` non-empty | `CurrentPassword` = 請輸入目前密碼。 (no DB read) |
 | 2 | `GetCredentialAsync(userId)` finds the row | 404 |
-| 3 | SHA-256(currentPassword) matches `PasswordHash` (constant-time, hex-case-insensitive) | `CurrentPassword` = 目前密碼錯誤。 — **nothing is written** |
+| 3 | `PasswordHasher.Verify(currentPassword, PasswordHash)` succeeds, in either stored format (constant-time) | `CurrentPassword` = 目前密碼錯誤。 — **nothing is written** |
 | 4 | `newPassword` non-empty | `NewPassword` = 請輸入新密碼。 |
 | 5 | `PasswordPolicy.IsCompliant(newPassword)` | `NewPassword` = `PasswordPolicy.Message` |
 | 6 | `newPassword == confirmNewPassword` (ordinal, no trimming) | `ConfirmNewPassword` = 新密碼與確認新密碼不一致。 |
 
-Success: `UpdatePasswordAsync(userId, Sha256Hex(newPassword), TimeProvider.GetUtcNow())` — transaction,
+Success: `UpdatePasswordAsync(userId, PasswordHasher.Hash(newPassword), TimeProvider.GetUtcNow())` — transaction,
 `SELECT COUNT(*)` (no row → **404**), `UPDATE AppUser SET PasswordHash = @PasswordHash, PasswordUpdatedTime =
 @PasswordUpdatedTime WHERE UserId = @UserId`, RowAudit `UPDATE` with `ActionDesc = "PasswordHash (changed by
 user)"`, commit; then `IPasswordStampCache.Invalidate(userId)` and **204**. `IsActive` is not re-checked (the
@@ -311,12 +338,14 @@ public sealed class PasswordStamp { DateTime? PasswordUpdatedTime; }            
 | `UpdateUserNameAsync(userId, userName)` | see My Profile |
 | `UpdatePasswordAsync(userId, hash, utcNow)` | see Change Password |
 | `GetPasswordStampAsync(userId)` | `SELECT PasswordUpdatedTime FROM AppUser WHERE UserId = @UserId` (Kind forced to UTC) |
+| `UpgradePasswordHashAsync(userId, hash)` | `UPDATE AppUser SET PasswordHash = @PasswordHash WHERE UserId = @UserId` — **only** that column: no `PasswordUpdatedTime`, no transaction, no RowAudit |
 
 ### Infrastructure
 
 | Type | Role |
 |------|------|
-| `PasswordHasher` | `Sha256Hex(string)` |
+| `PasswordHasher` | `Hash(string)` (salted PBKDF2, the only way to store), `Verify(password, storedHash, out needsUpgrade)`, `IsLegacyFormat(string?)`, `Sha256Hex(string)` (legacy verification only); `Pbkdf2Prefix`, `Iterations = 210_000`, `SaltBytes = 16`, `HashBytes = 32`, `LegacyHexLength = 64` |
+| `AuthorizationPolicies` | `Admin` (policy name) and `AdminRole` (the `AppUserRole.RoleId` it requires) |
 | `PasswordPolicy` | `MinLength = 8`, `MinCharacterClasses = 3`, `IsCompliant`, `Message` |
 | `AppConfigJson` | `ExtractDefaultPassword`, `ExtractSymmetricSecurityKey` (throw `AppConfigException`) |
 | `JwtTokenIssuer` (`IJwtTokenIssuer`) | builds the token; `Issuer`, `TokenLifetime`, `UserIdClaim`, `UserNameClaim`, `MustChangePasswordClaim` (+ `MustChangePasswordClaimValue = "true"`); `Issue(user, roleIds, key, mustChangePassword = false)` |
@@ -425,15 +454,20 @@ weak / mismatch never call the API, success clears the session and redirects, fa
 
 ## Not built / known gaps
 
-- **No endpoint-level authorization**: the API checks authentication only. Hiding 系統管理 Admin in the UI
-  is a convenience, not a control — any signed-in user can call the admin endpoints directly.
+- **Coarse authorization**: there is one role check (`Admin`) protecting the account / role endpoints.
+  `AppRole.PermissionLevel` is stored and editable but still enforced nowhere, so there is no per-endpoint or
+  per-record permission model; every authenticated user may write every content table.
+- Nothing stops an administrator from deleting or demoting their own account, so the last admin can lock
+  everyone out of the 系統管理 pages.
 - No token refresh, expiry warning, or logout-side revocation (a token stays valid for 24 h unless the
-  password changes).
+  password changes). Role changes only take effect at the next login, because roles are token claims.
 - No login throttling / lockout, no password history, and the admin default password is not policy-checked.
 - The default-password lock is detected at login only: a user who *chooses* a password equal to the current
   default is locked on their next login too (by design — the value is shared knowledge), and a session that
   was open when an admin reset the password is ended by the revocation stamp, not by the lock.
-- SHA-256 without salt is inherited from the legacy data format (see `AppUser.md`).
+- The unsalted SHA-256 format inherited from the legacy data (see `AppUser.md`) is still *readable*: rows are
+  only migrated to PBKDF2 when their owner next signs in or changes their password, so a dormant account keeps
+  a weak digest indefinitely. There is no batch migration and no report of how many rows are left.
 - Multi-instance deployments: a password change made on another instance (or by SQL) takes effect within the
   1-minute `PasswordStampCache` TTL; a rotated signing key within the 1-minute `SigningKeyCache` TTL.
 

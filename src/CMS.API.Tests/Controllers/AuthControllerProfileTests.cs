@@ -5,6 +5,7 @@ using CMS.API.Models;
 using CMS.API.Repositories;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 
 namespace CMS.API.Tests.Controllers;
@@ -17,7 +18,9 @@ public class AuthControllerProfileTests
 
     public AuthControllerProfileTests()
     {
-        _controller = new AuthController(_repository.Object, Mock.Of<IJwtTokenIssuer>(), TimeProvider.System, Mock.Of<IPasswordStampCache>());
+        _controller = new AuthController(
+            _repository.Object, Mock.Of<IJwtTokenIssuer>(), TimeProvider.System, Mock.Of<IPasswordStampCache>(),
+            NullLogger<AuthController>.Instance);
     }
 
     /// <summary>Mimics what the bearer handler produces: a <c>userId</c> claim plus one role claim per role.</summary>

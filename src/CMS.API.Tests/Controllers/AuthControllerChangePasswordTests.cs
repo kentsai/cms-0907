@@ -6,6 +6,7 @@ using CMS.API.Repositories;
 using CMS.API.Tests.Infrastructure;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 
 namespace CMS.API.Tests.Controllers;
@@ -24,9 +25,14 @@ public class AuthControllerChangePasswordTests
     private readonly Mock<IPasswordStampCache> _passwordStamps = new();
     private readonly AuthController _controller;
 
+    /// <summary>The hash handed to <c>UpdatePasswordAsync</c>, captured because hashing is salted and so not reproducible.</summary>
+    private string? _writtenHash;
+
     public AuthControllerChangePasswordTests()
     {
-        _controller = new AuthController(_repository.Object, Mock.Of<IJwtTokenIssuer>(), new FixedTimeProvider(Now), _passwordStamps.Object);
+        _controller = new AuthController(
+            _repository.Object, Mock.Of<IJwtTokenIssuer>(), new FixedTimeProvider(Now), _passwordStamps.Object,
+            NullLogger<AuthController>.Instance);
         SignInAs("helen");
     }
 
@@ -44,7 +50,7 @@ public class AuthControllerChangePasswordTests
         UserId = userId,
         UserName = "Helen Chen",
         IsActive = true,
-        PasswordHash = PasswordHasher.Sha256Hex(password)
+        PasswordHash = PasswordHasher.Hash(password)
     };
 
     private static ChangePasswordRequest Request(
@@ -58,8 +64,25 @@ public class AuthControllerChangePasswordTests
     private void SetupCredential(AppUserCredential? user, string userId = "helen") =>
         _repository.Setup(r => r.GetCredentialAsync(userId, It.IsAny<CancellationToken>())).ReturnsAsync(user);
 
-    private void SetupUpdate(string userId, string passwordHash, bool result = true) =>
-        _repository.Setup(r => r.UpdatePasswordAsync(userId, passwordHash, It.IsAny<DateTime>(), It.IsAny<CancellationToken>())).ReturnsAsync(result);
+    /// <summary>
+    /// Accepts whatever hash the controller produces and records it in <see cref="_writtenHash"/>: every new hash
+    /// carries a fresh random salt, so the test cannot predict the string and asserts with
+    /// <see cref="PasswordHasher.Verify"/> instead.
+    /// </summary>
+    private void SetupUpdate(string userId, bool result = true) =>
+        _repository
+            .Setup(r => r.UpdatePasswordAsync(userId, It.IsAny<string>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .Callback((string _, string hash, DateTime _, CancellationToken _) => _writtenHash = hash)
+            .ReturnsAsync(result);
+
+    /// <summary>The stored hash was rewritten and the given plaintext is what now opens the account.</summary>
+    private void AssertStoredPasswordIsNow(string password)
+    {
+        Assert.NotNull(_writtenHash);
+        Assert.False(PasswordHasher.IsLegacyFormat(_writtenHash));
+        Assert.True(PasswordHasher.Verify(password, _writtenHash, out var needsUpgrade));
+        Assert.False(needsUpgrade);
+    }
 
     private static void AssertFieldError(IActionResult result, string field, string message)
     {
@@ -81,23 +104,54 @@ public class AuthControllerChangePasswordTests
     // ---- success ----
 
     [Fact]
-    public async Task ChangePassword_StoresSha256OfTheNewPassword_AndTheCurrentTime()
+    public async Task ChangePassword_StoresASaltedHashOfTheNewPassword_AndTheCurrentTime()
     {
         SetupCredential(StoredUser());
-        SetupUpdate("helen", PasswordHasher.Sha256Hex(ValidNewPassword));
+        SetupUpdate("helen");
 
         var result = await _controller.ChangePassword(Request(), CancellationToken.None);
 
         Assert.IsType<NoContentResult>(result);
         _repository.Verify(r => r.UpdatePasswordAsync(
-            "helen", PasswordHasher.Sha256Hex(ValidNewPassword), Now.UtcDateTime, It.IsAny<CancellationToken>()), Times.Once);
+            "helen", It.IsAny<string>(), Now.UtcDateTime, It.IsAny<CancellationToken>()), Times.Once);
+        AssertStoredPasswordIsNow(ValidNewPassword);
+        // The old password must no longer open the account.
+        Assert.False(PasswordHasher.Verify(CurrentPassword, _writtenHash, out _));
+    }
+
+    [Fact]
+    public async Task ChangePassword_NeverStoresTheNewPasswordInTheLegacyUnsaltedFormat()
+    {
+        SetupCredential(StoredUser());
+        SetupUpdate("helen");
+
+        await _controller.ChangePassword(Request(), CancellationToken.None);
+
+        Assert.NotNull(_writtenHash);
+        Assert.NotEqual(PasswordHasher.Sha256Hex(ValidNewPassword), _writtenHash);
+        Assert.StartsWith(PasswordHasher.Pbkdf2Prefix, _writtenHash);
+    }
+
+    [Fact]
+    public async Task ChangePassword_SaltsEachHash_SoTheSamePasswordStoresDifferentValues()
+    {
+        SetupCredential(StoredUser());
+        SetupUpdate("helen");
+        await _controller.ChangePassword(Request(), CancellationToken.None);
+        var first = _writtenHash;
+
+        SetupCredential(StoredUser());
+        await _controller.ChangePassword(Request(), CancellationToken.None);
+
+        Assert.NotEqual(first, _writtenHash);
+        AssertStoredPasswordIsNow(ValidNewPassword);
     }
 
     [Fact]
     public async Task ChangePassword_InvalidatesTheCachedPasswordStamp_SoTheOldTokenIsRejectedNext()
     {
         SetupCredential(StoredUser());
-        SetupUpdate("helen", PasswordHasher.Sha256Hex(ValidNewPassword));
+        SetupUpdate("helen");
 
         await _controller.ChangePassword(Request(), CancellationToken.None);
 
@@ -114,7 +168,7 @@ public class AuthControllerChangePasswordTests
     public async Task ChangePassword_AcceptsPasswordsThatMeetThePolicy(string newPassword)
     {
         SetupCredential(StoredUser());
-        SetupUpdate("helen", PasswordHasher.Sha256Hex(newPassword));
+        SetupUpdate("helen");
 
         var result = await _controller.ChangePassword(Request(newPassword: newPassword), CancellationToken.None);
 
@@ -129,7 +183,7 @@ public class AuthControllerChangePasswordTests
 
         SignInAs("mike");
         SetupCredential(StoredUser("mike"), "mike");
-        SetupUpdate("mike", PasswordHasher.Sha256Hex(ValidNewPassword));
+        SetupUpdate("mike");
 
         await _controller.ChangePassword(Request(), CancellationToken.None);
 
@@ -139,16 +193,19 @@ public class AuthControllerChangePasswordTests
     }
 
     [Fact]
-    public async Task ChangePassword_MatchesTheStoredHashCaseInsensitively()
+    public async Task ChangePassword_MatchesALegacyStoredHashCaseInsensitively()
     {
+        // Rows written by the previous system hold an unsalted hex digest, sometimes upper-cased.
         var user = StoredUser();
-        user.PasswordHash = user.PasswordHash.ToUpperInvariant();
+        user.PasswordHash = PasswordHasher.Sha256Hex(CurrentPassword).ToUpperInvariant();
         SetupCredential(user);
-        SetupUpdate("helen", PasswordHasher.Sha256Hex(ValidNewPassword));
+        SetupUpdate("helen");
 
         var result = await _controller.ChangePassword(Request(), CancellationToken.None);
 
         Assert.IsType<NoContentResult>(result);
+        // Changing the password is also what retires the legacy format for that user.
+        AssertStoredPasswordIsNow(ValidNewPassword);
     }
 
     // ---- current password ----
@@ -277,7 +334,7 @@ public class AuthControllerChangePasswordTests
     public async Task ChangePassword_Returns404_WhenTheRowDisappearsBeforeTheUpdate()
     {
         SetupCredential(StoredUser());
-        SetupUpdate("helen", PasswordHasher.Sha256Hex(ValidNewPassword), result: false);
+        SetupUpdate("helen", result: false);
 
         var result = await _controller.ChangePassword(Request(), CancellationToken.None);
 

@@ -3,7 +3,7 @@
 Read this when choosing the next table to scaffold or when touching an existing feature's
 non-obvious behaviour. Specs live in `spec\{sub-system}\{Table}.md`; build with `/crud`.
 
-Totals as of 2026-09-09: **451 xUnit + 437 Karma** tests passing; `ng build` succeeds
+Totals as of 2026-09-10: **500 xUnit + 443 Karma** tests passing; `ng build` succeeds
 (the initial bundle exceeds the 500 kB budget *warning* because of PrimeNG shared chunks —
 not an error). Everything through Login, JWT authorization, My Profile, Change Password
 (with token revocation) and the forced change for default-password logins is on `develop`.
@@ -76,15 +76,16 @@ list. Session key `featured-promo-list-filters` stores `{ trainingCenterPkid, we
 
 **AppUser** (`spec\auth\AppUser.md`) — string PK `UserId`, N-N with `AppRole` via
 `AppUserRole`. **`PasswordHash` never crosses the API**: excluded from request and Angular
-models; create seeds it with SHA-256 of `SysConfig.appConfig.defaultPassword`; update
+models; create seeds it with `PasswordHasher.Hash` of `SysConfig.appConfig.defaultPassword`; update
 never touches it; `POST /api/app-users/{id}/reset-password` re-applies the default
 (detail page has a 重設密碼 button). The `app-users` lookup lives in `AppUserRepository`.
-The lowercase-hex hash format is an assumption — no legacy hashes were available.
+**Administrators only** since the security fix below: the whole controller and the `app-roles` lookup carry
+`[Authorize(Policy = AuthorizationPolicies.Admin)]`, and the SPA routes carry `adminGuard`.
 
 **Login** (`POST /api/auth/login`; spec `spec\auth\Auth.md`, derived from the implementation) — body `{ userId, password }`;
 `AuthController` loads the `AppUser` row via `IAuthRepository.GetCredentialAsync`, then requires an
 **ordinal** `UserId` match (the DB lookup may be collation-insensitive), `IsActive = 1`, and a
-constant-time, hex-case-insensitive match of SHA-256(password) against `PasswordHash`. Any failure →
+constant-time `PasswordHasher.Verify` of the password against `PasswordHash`. Any failure →
 **401** with the single generic body `{ "message": "帳號或密碼錯誤。" }` (`AuthController.InvalidCredentialsMessage`);
 roles and signing key are never queried on failure. Success → `{ userId, userName, accessToken }`
 (`LoginResponse`, no password member). The JWT (`JwtTokenIssuer`) is HS256 signed with
@@ -102,8 +103,9 @@ the `userName` claim as `UserName` (fallback `userId`; see the generic writer be
 a `登出` button (clears sessionStorage, including remembered list filters); the `系統管理 Admin` menu group is
 only rendered when the token's roles include `Admin`. Tests: `JwtBearerAuthorizationTests` (in-memory host
 via `CmsApiFactory`), `SigningKeyCacheTests`; Karma specs for `AuthService`, interceptor, guard, JWT util,
-`LoginComponent` and the shell. Not built: role-based authorization on individual API endpoints (Admin-only
-menu is a UI convenience; the API only checks authentication), token refresh / expiry warning.
+`LoginComponent` and the shell. Role-based authorization now exists for the account / role endpoints only
+(see the security hardening entry below); everything else still checks authentication alone. Not built:
+per-endpoint or `PermissionLevel`-driven permissions, token refresh / expiry warning.
 
 **My Profile** (`/profile`, 個人資料; spec `spec\auth\Auth.md`) — `PUT /api/auth/profile` `{ userName }` updates the
 caller's own `AppUser.UserName`; the user comes **only** from the token's `userId` claim (the request type has
@@ -120,7 +122,7 @@ user from the token, then in order: current password must hash to the stored `Pa
 `CurrentPassword` = `目前密碼錯誤。`, nothing written), new password must pass `Infrastructure\PasswordPolicy`
 (≥ 8 chars and ≥ 3 of upper / lower / digit / ASCII symbol; else 400 `NewPassword` = `PasswordPolicy.Message`),
 confirmation must equal it exactly (else 400 `ConfirmNewPassword`). Then
-`IAuthRepository.UpdatePasswordAsync(userId, SHA-256(new), TimeProvider.GetUtcNow())` sets `PasswordHash` +
+`IAuthRepository.UpdatePasswordAsync(userId, PasswordHasher.Hash(new), TimeProvider.GetUtcNow())` sets `PasswordHash` +
 `PasswordUpdatedTime` and writes RowAudit `PasswordHash (changed by user)`; no row → 404. No hash crosses the
 API in either direction. Frontend: `AuthService.changePassword`, `core/utils/password.validator.ts`
 (`meetsPasswordPolicy` mirrors the API rule, `passwordPolicyValidator`, `passwordsMatchValidator`) and a
@@ -204,6 +206,38 @@ only for published courses, sets `document.title` to `{courseId} {title}` (defau
 `afterNextRender` after the course and the QR have settled. `QrCodeComponent` gained `showDownload` (input) and
 `settled` (`'ready' | 'error'` output). No API change, no new packages. Tests: `course-print.component.spec.ts` (17),
 `course-detail.component.spec.ts` (+2), `qr-code.component.spec.ts` (+2), `app.spec.ts` (+2 chromeless).
+
+**Security hardening from the /cso audit** (branch `feature-course-pdf`, 2026-09-10; report
+`.gstack\security-reports\2026-09-10-022718.json`) — three findings fixed.
+
+1. **Admin authorization** (was CRITICAL: the API checked authentication only, so any signed-in user could
+   create accounts, delete them, rewrite role membership via `AppRoleRequest.UserIds`, or reset an
+   administrator's password to the shared default and take the account over). `Program.cs` now registers
+   `AuthorizationPolicies.Admin` = `RequireRole("Admin")`; `AppUsersController`, `AppRolesController` and
+   `LookupsController.AppUsers` / `.AppRoles` carry `[Authorize(Policy = …)]`. A non-administrator gets **403**
+   and the repository is never reached; a missing token is still **401** (the global `AuthorizeFilter` runs
+   first). The SPA mirrors it with `core/guards/admin.guard.ts` on the two `admin/app-*` route groups,
+   redirecting to `/home/featured-promo-items`. Content CRUD is unchanged — still any authenticated user.
+2. **Password storage** (was HIGH: unsalted single-round SHA-256). `PasswordHasher` now has `Hash` /
+   `Verify` / `IsLegacyFormat` on top of PBKDF2-HMAC-SHA256, 210 000 iterations, 16-byte random salt, stored
+   as `pbkdf2-sha256$<iterations>$<salt>$<hash>` (90 chars, fits `nvarchar(800)`). Legacy hex rows still
+   verify and are rewritten by `IAuthRepository.UpgradePasswordHashAsync` on the owner's next login —
+   `PasswordUpdatedTime` untouched (it is the revocation stamp) and no RowAudit row (the credential did not
+   change). A failure there is logged and swallowed so the login still succeeds. Verified end-to-end against
+   the local `CMS` database: the seeded `admin@example.com` row migrated from 64-char hex to PBKDF2 on login,
+   the timestamp stayed at `2026-01-01T00:00:00`, and no audit row appeared.
+3. **Swagger** (was MEDIUM: served unauthenticated in every environment, because the global `AuthorizeFilter`
+   is an MVC filter and never covers middleware). `app.UseSwagger()` / `UseSwaggerUI()` are now inside
+   `if (app.Environment.IsDevelopment())`. Confirmed by probe: 404 under `Production`, 200 under `Development`.
+
+Tests: `Infrastructure\AdminAuthorizationTests` (17: 403 per admin endpoint with the repository never called,
+403 for a no-roles token, 200 for an admin, content still open to an editor, 401 beats 403, a flagged
+must-change-password admin still 403, plus reflection tests pinning the guarded controller and lookup sets),
+`PasswordHasherTests` (rewritten, 24), `AuthControllerTests` (+6 legacy-migration cases),
+`AuthControllerChangePasswordTests` (salted-hash assertions), `admin.guard.spec.ts` (6).
+Also fixed a pre-existing Karma flake: `auth.interceptor.spec.ts` verified an HTTP backend in `afterEach`
+that its two pure `serverErrorDetail` specs never created, so the suite failed whenever Jasmine's random
+order ran them first.
 
 ## Lookup endpoints (`/api/lookups/*`)
 

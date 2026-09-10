@@ -1,6 +1,7 @@
 using CMS.API.Infrastructure;
 using CMS.API.Models;
 using CMS.API.Repositories;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace CMS.API.Controllers;
@@ -9,8 +10,14 @@ namespace CMS.API.Controllers;
 /// String-keyed entity: <c>{id}</c> is <c>UserId</c>, so routes carry no <c>:int</c> constraint.
 /// The password hash never crosses this boundary — creation seeds it from the system default and
 /// <see cref="ResetPassword"/> is the only way to change it.
+/// <para>
+/// Administrators only (<see cref="AuthorizationPolicies.Admin"/>, on top of the global authentication filter):
+/// these actions create accounts, delete them, change role membership and reset a password to the shared system
+/// default. A signed-in non-administrator gets <b>403</b> and the repository is never reached.
+/// </para>
 /// </summary>
 [ApiController]
+[Authorize(Policy = AuthorizationPolicies.Admin)]
 [Route("api/app-users")]
 [Produces("application/json")]
 public class AppUsersController(IAppUserRepository repository) : ControllerBase

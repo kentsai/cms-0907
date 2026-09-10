@@ -72,6 +72,22 @@ public sealed class AuthRepository(IDbConnectionFactory connectionFactory, IRowA
         return true;
     }
 
+    public async Task<bool> UpgradePasswordHashAsync(string userId, string passwordHash, CancellationToken cancellationToken)
+    {
+        // PasswordHash only: PasswordUpdatedTime is the token-revocation stamp, and the password did not change.
+        const string sql = """
+            UPDATE AppUser
+            SET PasswordHash = @PasswordHash
+            WHERE UserId = @UserId;
+            """;
+
+        await using var connection = await connectionFactory.CreateOpenConnectionAsync(cancellationToken);
+        var affected = await connection.ExecuteAsync(new CommandDefinition(
+            sql, new { UserId = userId, PasswordHash = passwordHash }, cancellationToken: cancellationToken));
+
+        return affected > 0;
+    }
+
     public async Task<AppUserCredential?> GetCredentialAsync(string userId, CancellationToken cancellationToken)
     {
         // The only SELECT in the code base that reads PasswordHash. The row is compared in memory by the controller

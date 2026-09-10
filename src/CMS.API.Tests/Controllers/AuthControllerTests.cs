@@ -11,6 +11,7 @@ using CMS.API.Repositories;
 using CMS.API.Tests.Infrastructure;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.IdentityModel.Tokens;
 using Moq;
 
@@ -30,16 +31,33 @@ public class AuthControllerTests
     public AuthControllerTests()
     {
         // A real issuer with a pinned clock so the JWT can be decoded and its claims / expiry asserted.
-        _controller = new AuthController(_repository.Object, new JwtTokenIssuer(new FixedTimeProvider(IssuedAt)), new FixedTimeProvider(IssuedAt), Mock.Of<IPasswordStampCache>());
+        _controller = new AuthController(
+            _repository.Object, new JwtTokenIssuer(new FixedTimeProvider(IssuedAt)), new FixedTimeProvider(IssuedAt),
+            Mock.Of<IPasswordStampCache>(), NullLogger<AuthController>.Instance);
     }
 
+    /// <summary>A row stored in the current (salted PBKDF2) format, so a login needs no hash upgrade.</summary>
     private static AppUserCredential ActiveUser(string userId = "helen", bool isActive = true) => new()
     {
         UserId = userId,
         UserName = "Helen Chen",
         IsActive = isActive,
-        PasswordHash = PasswordHasher.Sha256Hex(Password)
+        PasswordHash = PasswordHasher.Hash(Password)
     };
+
+    /// <summary>A row still in the pre-PBKDF2 format: an unsalted SHA-256 hex digest.</summary>
+    private static AppUserCredential LegacyUser(string password = Password, string userId = "helen") => new()
+    {
+        UserId = userId,
+        UserName = "Helen Chen",
+        IsActive = true,
+        PasswordHash = PasswordHasher.Sha256Hex(password)
+    };
+
+    private void SetupHashUpgrade(string userId = "helen", bool result = true) =>
+        _repository
+            .Setup(r => r.UpgradePasswordHashAsync(userId, It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(result);
 
     private static LoginRequest Request(string userId = "helen", string password = Password) => new()
     {
@@ -143,14 +161,97 @@ public class AuthControllerTests
     [Fact]
     public async Task Login_AcceptsUpperCaseHexHashStoredInDatabase()
     {
-        var user = ActiveUser();
+        var user = LegacyUser();
         user.PasswordHash = user.PasswordHash.ToUpperInvariant();
         _repository.Setup(r => r.GetCredentialAsync("helen", It.IsAny<CancellationToken>())).ReturnsAsync(user);
+        SetupSuccessPath("helen", []);
+        SetupHashUpgrade();
+
+        var result = await _controller.Login(Request(), CancellationToken.None);
+
+        Assert.IsType<OkObjectResult>(result.Result);
+    }
+
+    // ---- legacy hashes are migrated to the salted format on the next successful login ----
+
+    [Fact]
+    public async Task Login_WithALegacyHash_RewritesItInTheCurrentFormat_WithoutTouchingPasswordUpdatedTime()
+    {
+        _repository.Setup(r => r.GetCredentialAsync("helen", It.IsAny<CancellationToken>())).ReturnsAsync(LegacyUser());
+        SetupSuccessPath("helen", []);
+        string? upgraded = null;
+        _repository
+            .Setup(r => r.UpgradePasswordHashAsync("helen", It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Callback((string _, string hash, CancellationToken _) => upgraded = hash)
+            .ReturnsAsync(true);
+
+        var result = await _controller.Login(Request(), CancellationToken.None);
+
+        Assert.IsType<OkObjectResult>(result.Result);
+        Assert.NotNull(upgraded);
+        Assert.StartsWith(PasswordHasher.Pbkdf2Prefix, upgraded);
+        Assert.False(PasswordHasher.IsLegacyFormat(upgraded));
+        // The new value still verifies, and the row is now up to date so nothing further is flagged.
+        Assert.True(PasswordHasher.Verify(Password, upgraded, out var stillNeedsUpgrade));
+        Assert.False(stillNeedsUpgrade);
+        // UpdatePasswordAsync would move PasswordUpdatedTime and revoke every live session; the re-hash must not.
+        _repository.Verify(r => r.UpdatePasswordAsync(
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Login_WithACurrentFormatHash_DoesNotRewriteIt()
+    {
+        _repository.Setup(r => r.GetCredentialAsync("helen", It.IsAny<CancellationToken>())).ReturnsAsync(ActiveUser());
         SetupSuccessPath("helen", []);
 
         var result = await _controller.Login(Request(), CancellationToken.None);
 
         Assert.IsType<OkObjectResult>(result.Result);
+        _repository.Verify(r => r.UpgradePasswordHashAsync(
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Login_RejectedByAWrongPassword_NeverRewritesTheHash()
+    {
+        _repository.Setup(r => r.GetCredentialAsync("helen", It.IsAny<CancellationToken>())).ReturnsAsync(LegacyUser());
+
+        var result = await _controller.Login(Request(password: "not-the-password"), CancellationToken.None);
+
+        AssertGenericUnauthorized(result);
+        _repository.Verify(r => r.UpgradePasswordHashAsync(
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Login_OfAnInactiveUserWithTheRightPassword_NeverRewritesTheHash()
+    {
+        var user = LegacyUser();
+        user.IsActive = false;
+        _repository.Setup(r => r.GetCredentialAsync("helen", It.IsAny<CancellationToken>())).ReturnsAsync(user);
+
+        var result = await _controller.Login(Request(), CancellationToken.None);
+
+        AssertGenericUnauthorized(result);
+        _repository.Verify(r => r.UpgradePasswordHashAsync(
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Login_StillSucceeds_WhenTheHashUpgradeFails()
+    {
+        _repository.Setup(r => r.GetCredentialAsync("helen", It.IsAny<CancellationToken>())).ReturnsAsync(LegacyUser());
+        SetupSuccessPath("helen", []);
+        _repository
+            .Setup(r => r.UpgradePasswordHashAsync("helen", It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("database unavailable"));
+
+        var result = await _controller.Login(Request(), CancellationToken.None);
+
+        // The credentials were already proven; a storage-migration failure must not cost the user their login.
+        var body = Assert.IsType<LoginResponse>(Assert.IsType<OkObjectResult>(result.Result).Value);
+        Assert.NotEmpty(body.AccessToken);
     }
 
     // ---- 401 paths: identical generic body, no token work performed ----
@@ -238,7 +339,7 @@ public class AuthControllerTests
     public async Task Login_WithTheDefaultPassword_FlagsTheResponseAndTheToken()
     {
         var user = ActiveUser();
-        user.PasswordHash = PasswordHasher.Sha256Hex(DefaultPassword); // admin-seeded / reset account
+        user.PasswordHash = PasswordHasher.Hash(DefaultPassword); // admin-seeded / reset account
         _repository.Setup(r => r.GetCredentialAsync("helen", It.IsAny<CancellationToken>())).ReturnsAsync(user);
         SetupSuccessPath("helen", ["Editor"]);
 
@@ -269,7 +370,7 @@ public class AuthControllerTests
     {
         // The stored hash is of the mixed-case variant, so the login succeeds, but it is not the configured default.
         var user = ActiveUser();
-        user.PasswordHash = PasswordHasher.Sha256Hex(DefaultPassword.ToUpperInvariant());
+        user.PasswordHash = PasswordHasher.Hash(DefaultPassword.ToUpperInvariant());
         _repository.Setup(r => r.GetCredentialAsync("helen", It.IsAny<CancellationToken>())).ReturnsAsync(user);
         SetupSuccessPath("helen", []);
 

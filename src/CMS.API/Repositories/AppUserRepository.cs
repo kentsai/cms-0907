@@ -202,7 +202,10 @@ public sealed class AppUserRepository(IDbConnectionFactory connectionFactory, IR
 
     // ---- helpers ----
 
-    /// <summary>Reads SysConfig.appConfig on the caller's transaction and hashes its defaultPassword.</summary>
+    /// <summary>
+    /// Reads SysConfig.appConfig on the caller's transaction and hashes its defaultPassword in the current format.
+    /// Each call salts afresh, so two accounts seeded with the same default do not share a stored value.
+    /// </summary>
     private static async Task<string> GetDefaultPasswordHashAsync(
         DbConnection connection, DbTransaction transaction, CancellationToken cancellationToken)
     {
@@ -211,7 +214,7 @@ public sealed class AppUserRepository(IDbConnectionFactory connectionFactory, IR
             new { ConfigKey = AppConfigJson.ConfigKey }, transaction, cancellationToken: cancellationToken));
 
         var defaultPassword = AppConfigJson.ExtractDefaultPassword(configValue);
-        return PasswordHasher.Sha256Hex(defaultPassword);
+        return PasswordHasher.Hash(defaultPassword);
     }
 
     private sealed class UserScalars

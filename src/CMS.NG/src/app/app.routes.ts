@@ -1,4 +1,5 @@
 import { Routes } from '@angular/router';
+import { adminGuard } from '@core/guards/admin.guard';
 import { authGuard } from '@core/guards/auth.guard';
 
 /** Every signed-in page. Wrapped by `routes` below, which guards the whole group. */
@@ -11,7 +12,9 @@ const featureRoutes: Routes = [
         .then(m => m.FeaturedPromoListComponent)
   },
   {
+    // Administrators only, mirroring the API's Admin policy on AppUsersController and the app-roles lookup.
     path: 'admin/app-users',
+    canActivate: [adminGuard],
     children: [
       {
         path: '',
@@ -41,7 +44,9 @@ const featureRoutes: Routes = [
     ]
   },
   {
+    // Administrators only, mirroring the API's Admin policy on AppRolesController and the app-users lookup.
     path: 'admin/app-roles',
+    canActivate: [adminGuard],
     children: [
       {
         path: '',

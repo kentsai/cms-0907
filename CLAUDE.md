@@ -24,9 +24,15 @@ cd C:\dev\cms\src\CMS.NG; npx ng test --watch=false --browsers=ChromeHeadless
 - Files with Chinese text: edit with Write/Edit tools, never Bash `perl`/heredocs.
 - No local `CMS` database: unit tests pass, live data calls fail.
 - MSB3027 on `CMS.API.exe` = API running; build with `-p:ArtifactsPath=<tmp>` instead of killing it.
-- Every API action except `POST /api/auth/login` needs a Bearer JWT (global filter, no role checks);
-  `PasswordHash` never crosses the API, and a password change revokes older tokens. A login with the
-  default password gets a token that only opens `change-password` (403 elsewhere; SPA route `/change-password`).
+- Every API action except `POST /api/auth/login` needs a Bearer JWT (global filter). The account / role
+  endpoints (`AppUsersController`, `AppRolesController`, the `app-users` + `app-roles` lookups) additionally
+  require the `Admin` role via `[Authorize(Policy = AuthorizationPolicies.Admin)]` — 403 otherwise; the SPA
+  mirrors it with `adminGuard`. `PasswordHash` never crosses the API, and a password change revokes older
+  tokens. A login with the default password gets a token that only opens `change-password` (403 elsewhere;
+  SPA route `/change-password`).
+- Passwords are salted PBKDF2 (`PasswordHasher.Hash` / `.Verify`); legacy unsalted SHA-256 rows still verify
+  and are rewritten in place on the owner's next login. Never store `Sha256Hex` output.
+- Swagger is registered only when `app.Environment.IsDevelopment()`; set `ASPNETCORE_ENVIRONMENT` on deploys.
 - Chromeless routes: a route with `data: { chromeless: true }` (the course print view
   `/course/courses/:id/print`) renders only the outlet, no shell / toast / confirm dialog (`app.ts`).
 

@@ -77,7 +77,10 @@ builder.Services.AddSingleton<ISigningKeyCache, SigningKeyCache>();
 builder.Services.AddSingleton<IPasswordStampCache, PasswordStampCache>();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer();
 builder.Services.ConfigureOptions<ConfigureJwtBearerOptions>();
-builder.Services.AddAuthorization();
+// Authentication is the baseline for every action (the global filter above); the endpoints that hand out access
+// itself — accounts, passwords, role membership — additionally require the Admin role claim.
+builder.Services.AddAuthorization(options => options.AddPolicy(
+    AuthorizationPolicies.Admin, policy => policy.RequireRole(AuthorizationPolicies.AdminRole)));
 
 // Feature repositories
 builder.Services.AddScoped<IPublishStatusRepository, PublishStatusRepository>();
@@ -95,8 +98,14 @@ var app = builder.Build();
 // answered with 500 + { message, traceId } (see GlobalExceptionMiddleware).
 app.UseMiddleware<GlobalExceptionMiddleware>();
 
-app.UseSwagger();
-app.UseSwaggerUI(options => options.SwaggerEndpoint("/swagger/v1/swagger.json", "CMS API v1"));
+// Development only. Both are plain middleware, so the global AuthorizeFilter (an MVC action filter) never runs
+// for them: left on, they would publish the whole API surface — every route, schema and admin endpoint — to
+// anonymous callers of a deployed environment. Set ASPNETCORE_ENVIRONMENT explicitly on every deploy target.
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI(options => options.SwaggerEndpoint("/swagger/v1/swagger.json", "CMS API v1"));
+}
 
 app.UseCors(LocalhostCorsPolicy);
 

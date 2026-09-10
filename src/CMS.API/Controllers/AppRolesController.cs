@@ -1,12 +1,21 @@
 using CMS.API.Infrastructure;
 using CMS.API.Models;
 using CMS.API.Repositories;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace CMS.API.Controllers;
 
-/// <summary>String-keyed entity: <c>{id}</c> is <c>RoleId</c>, so routes carry no <c>:int</c> constraint.</summary>
+/// <summary>
+/// String-keyed entity: <c>{id}</c> is <c>RoleId</c>, so routes carry no <c>:int</c> constraint.
+/// <para>
+/// Administrators only (<see cref="AuthorizationPolicies.Admin"/>, on top of the global authentication filter):
+/// <c>AppRoleRequest.UserIds</c> rewrites <c>AppUserRole</c> membership, so write access here is write access to
+/// everyone's roles. A signed-in non-administrator gets <b>403</b> and the repository is never reached.
+/// </para>
+/// </summary>
 [ApiController]
+[Authorize(Policy = AuthorizationPolicies.Admin)]
 [Route("api/app-roles")]
 [Produces("application/json")]
 public class AppRolesController(IAppRoleRepository repository) : ControllerBase

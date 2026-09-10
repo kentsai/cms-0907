@@ -28,6 +28,16 @@ public sealed class CmsApiFactory : WebApplicationFactory<Program>
     public Mock<IPublishStatusRepository> PublishStatusRepository { get; } = new(MockBehavior.Strict);
     public Mock<IRowAuditRepository> RowAuditRepository { get; } = new(MockBehavior.Strict);
 
+    /// <summary>
+    /// Set before the first request to put the 系統管理 admin repositories in the container as well; left null they
+    /// are not replaced, because most tests never reach those controllers. Used by <c>AdminAuthorizationTests</c> to
+    /// assert that a refused request never touches the repository behind the endpoint.
+    /// </summary>
+    public Mock<IAppUserRepository>? AppUserRepository { get; set; }
+
+    /// <inheritdoc cref="AppUserRepository"/>
+    public Mock<IAppRoleRepository>? AppRoleRepository { get; set; }
+
     /// <summary>Everything the hosted API logged, so a test can assert what reached the server log and what did not.</summary>
     public CapturingLoggerProvider Logs { get; } = new();
 
@@ -52,6 +62,10 @@ public sealed class CmsApiFactory : WebApplicationFactory<Program>
         AuthRepository
             .Setup(r => r.GetPasswordStampAsync(UserId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PasswordStamp { PasswordUpdatedTime = null });
+        // Only reached when a test seeds a legacy hash; Credential() below already stores the current format.
+        AuthRepository
+            .Setup(r => r.UpgradePasswordHashAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
 
         PublishStatusRepository
             .Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
@@ -63,8 +77,11 @@ public sealed class CmsApiFactory : WebApplicationFactory<Program>
         UserId = UserId,
         UserName = UserName,
         IsActive = true,
-        PasswordHash = PasswordHasher.Sha256Hex(password)
+        PasswordHash = PasswordHasher.Hash(password)
     };
+
+    /// <summary>The default role set for a token: the seeded user is an administrator (see <c>GetRoleIdsAsync</c>).</summary>
+    public static readonly string[] AdminRoles = [AuthorizationPolicies.AdminRole];
 
     /// <summary>A token exactly as <c>POST /api/auth/login</c> would issue it, optionally with a pinned clock or another key.</summary>
     public static string IssueToken(TimeProvider? clock = null, string signingKey = SigningKey, params string[] roles) =>
@@ -89,6 +106,18 @@ public sealed class CmsApiFactory : WebApplicationFactory<Program>
 
             services.RemoveAll<IRowAuditRepository>();
             services.AddSingleton(RowAuditRepository.Object);
+
+            if (AppUserRepository is not null)
+            {
+                services.RemoveAll<IAppUserRepository>();
+                services.AddSingleton(AppUserRepository.Object);
+            }
+
+            if (AppRoleRepository is not null)
+            {
+                services.RemoveAll<IAppRoleRepository>();
+                services.AddSingleton(AppRoleRepository.Object);
+            }
         });
     }
 }
