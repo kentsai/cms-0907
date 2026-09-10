@@ -261,7 +261,12 @@ export const routes: Routes = [
         loadComponent: () =>
           import('@features/auth/change-password/change-password.component').then(m => m.ChangePasswordComponent)
       },
-      ...featureRoutes
+      ...featureRoutes,
+      // A mistyped or stale-bookmarked URL used to match nothing: Angular threw NG04002 and left the
+      // outlet empty, so the shell rendered around a blank page with no message and no way back.
+      // Inside the authGuard group on purpose — a signed-out visitor still gets /login?returnUrl=…
+      // and a default-password session still gets /change-password, exactly as any other URL.
+      { path: '**', redirectTo: 'home/featured-promo-items' }
     ]
   }
 ];
