@@ -3,7 +3,7 @@
 Read this when choosing the next table to scaffold or when touching an existing feature's
 non-obvious behaviour. Specs live in `spec\{sub-system}\{Table}.md`; build with `/crud`.
 
-Totals as of 2026-09-10: **512 xUnit + 443 Karma** tests passing; `ng build` succeeds
+Totals as of 2026-09-10 (v1.0.0.0): **536 xUnit + 457 Karma** tests passing; `ng build` succeeds
 (the initial bundle exceeds the 500 kB budget *warning* because of PrimeNG shared chunks —
 not an error). Everything through Login, JWT authorization, My Profile, Change Password
 (with token revocation) and the forced change for default-password logins is on `develop`.
@@ -78,7 +78,13 @@ list. Session key `featured-promo-list-filters` stores `{ trainingCenterPkid, we
 `AppUserRole`. **`PasswordHash` never crosses the API**: excluded from request and Angular
 models; create seeds it with `PasswordHasher.Hash` of `SysConfig.appConfig.defaultPassword`; update
 never touches it; `POST /api/app-users/{id}/reset-password` re-applies the default
-(detail page has a 重設密碼 button). The `app-users` lookup lives in `AppUserRepository`.
+(detail page has a 重設密碼 button), then calls `IPasswordStampCache.Invalidate(userId)` so the target's
+existing token is rejected on its very next request rather than up to a minute later. `PasswordUpdatedTime`
+on create and on reset is written from the injected `TimeProvider`, not SQL `GETUTCDATE()`: it is compared
+against the token's `iat`, which comes from the same clock, and a database clock a second behind the web
+server's made the reset revoke nothing. The reset's RowAudit description is plain `PasswordHash` — it used to
+read `PasswordHash (reset to default)`, which turned the readable 異動紀錄 trail into a list of accounts
+currently standing on the shared default password. The `app-users` lookup lives in `AppUserRepository`.
 **Administrators only** since the security fix below: the whole controller and the `app-roles` lookup carry
 `[Authorize(Policy = AuthorizationPolicies.Admin)]`, and the SPA routes carry `adminGuard`.
 
@@ -182,12 +188,19 @@ Tests: `RowAuditWriterTests` (20), `AuditHelperTests` (+2), `Repositories\Partne
 **異動紀錄 History badge** (branch `feature-row-audit`, 2026-09-08) — `GET /api/row-audits?tableName=&pkid=`
 (`RowAuditsController.GetForRecord`, replaces the old `/api/row-audits/{table}/{pk}?take=`) returns the record's
 **full** trail newest first as `{ dateTime, userName, actionType, actionDesc }`; a missing filter → 400
-`ValidationProblem`. `core/components/row-audit-badge` (`<app-row-audit-badge tableName [pkid]>`) is now a
+`ValidationProblem`. **`tableName` `AppUser` or `AppRole` requires the `Admin` role** (`AdminOnlyTables`,
+`StringComparer.OrdinalIgnoreCase`, matched after `Trim()`) → **403** `只有管理者可以查看帳號與角色的異動紀錄。`;
+every content table's trail stays open to any signed-in user. The gate lives in the action rather than in an
+attribute because the table is a *query-string value*: the Admin policy on `AppUsersController` /
+`AppRolesController` guarded the rows but not their history, so any signed-in user could read who changed
+which account and when. `core/components/row-audit-badge` (`<app-row-audit-badge tableName [pkid]>`) is now a
 `p-button` labelled 異動紀錄 History that shows the newest entry inline (`Update by alice · 2026-06-04 14:30`,
 `尚無異動紀錄 No history`, `無法載入 Unavailable`) and opens a `p-dialog` + `p-table` with the whole trail
 (`尚無異動紀錄 No history yet` when empty); it is on all 14 detail / edit toolbars. The input was renamed `pk` →
 `pkid`; the service method `getForRow(table, pk, take)` → `getForRecord(table, pkid)`. Tests:
-`RowAuditsControllerTests` (8), `RowAuditRepositoryTests` (6), `RowAuditsEndpointTests` (11, in-memory host) and
+`RowAuditsControllerTests` (19, including the admin-table gate and its casing / whitespace variants),
+`RowAuditRepositoryTests` (6), `RowAuditsEndpointTests` (14, in-memory host: 403 for an editor, 200 for an
+admin, content tables still open) and
 `row-audit-badge.component.spec.ts` (12: inline latest, empty state, dialog trail, dash for null desc, failure
 state, string keys, no pkid, record change).
 
@@ -267,6 +280,27 @@ prop; the repo copy stamps **`Production`**, so a deployed API never serves `/sw
 design) and both scripts print `GET /api/publish-statuses` (401 = up) as the smoke test instead. Not yet
 exercised end-to-end on this machine — IIS is not installed here (see `environment.md`). Details:
 `feature-infrastructure.md` (layout) and `DEPLOY-IIS.md` (runbook).
+
+**v1.0.0.0 release hardening** (2026-09-10, commits `a7e567a` / `f1cfc41` / `03488f4`) — the last pass before
+the first landing on `main`. Four API changes, all described in their own entries above except these:
+
+1. **Concurrent create returns 409, not 500.** AppRole, AppUser and PublishStatus check `ExistsAsync` before
+   inserting, but that is a read followed by a write, so two callers racing on the same key both pass it and
+   the loser hit the primary key. The three repositories now catch `SqlException` 2627 / 2601 through the new
+   `Infrastructure\SqlErrorNumbers` and throw the new `Infrastructure\DuplicateKeyException`; the controllers
+   turn it into the same `409` (and the same Chinese message) the pre-check produces. `SqlErrorNumbers` also
+   replaces the private `SqlForeignKeyViolation` / unique-violation constants that were re-declared in each of
+   the eight repositories — that duplication is how one of them ended up catching a different set.
+2. **`AppRoleRepository.Normalize` null-guards its id list** (`IEnumerable<string>?`, `ids ?? []`), matching
+   the AppUser / Certification / Course copies. `System.Text.Json` does not honour non-nullable reference
+   annotations, so a body carrying `"userIds": null` set the property to null and threw a
+   `NullReferenceException` → 500 on input the sibling paths already handled.
+3. **Product name.** The shell topbar and `index.html` `<title>` read `CMS`; `CMS-React` was a leftover from
+   the scaffold this project was generated from.
+4. **Accessibility minimums** (`f1cfc41`, following the `/design-review` findings already on `develop`): a
+   global `--cms-error-color` token, a 44 px floor for row-action icon buttons, the previously undefined
+   `.muted-if-empty` class, `100dvh` on the shell, and phone wrapping for the promo board's `.week-nav`
+   header — see the *Global styles* notes in `feature-infrastructure.md`.
 
 ## Lookup endpoints (`/api/lookups/*`)
 

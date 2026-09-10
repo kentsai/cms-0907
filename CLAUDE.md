@@ -47,8 +47,11 @@ smoke-test with `GET :5001/api/publish-statuses` (401 without a token = up).
   `PublishStatusesController` additionally require the `Admin` role via
   `[Authorize(Policy = AuthorizationPolicies.Admin)]` — 403 otherwise; the SPA mirrors it with `adminGuard`.
   The `publish-statuses` **lookup** stays open to every signed-in user: it fills the course form's 上架狀態
-  dropdown. `PasswordHash` never crosses the API, and a password change revokes older
-  tokens. A login with the default password gets a token that only opens `change-password` (403 elsewhere;
+  dropdown. `GET /api/row-audits` is guarded by value, not by attribute: `tableName` `AppUser` / `AppRole`
+  (case-insensitive, after trimming) needs the `Admin` role — 403 otherwise — while every content table's
+  trail stays open to any signed-in user. `PasswordHash` never crosses the API, and a password change revokes older
+  tokens — self-service *and* an admin reset, which invalidates the target's `PasswordStampCache` entry so the
+  next request with the old token is 401. A login with the default password gets a token that only opens `change-password` (403 elsewhere;
   SPA route `/change-password`).
 - Passwords are salted PBKDF2 (`PasswordHasher.Hash` / `.Verify`); legacy unsalted SHA-256 rows still verify
   and are rewritten in place on the owner's next login. Never store `Sha256Hex` output.
@@ -70,6 +73,8 @@ smoke-test with `GET :5001/api/publish-statuses` (401 without a token = up).
 | `docs\claude\feature-status.md` | What is built (with test totals), non-obvious feature behaviour, next tables |
 | `docs\claude\environment.md` | A build, install, shell, or tool misbehaves; what this box has (and lacks) for an IIS deploy |
 | `DEPLOY-IIS.md` | Deploying to IIS: topology, one-time setup, remote servers, troubleshooting table |
+| `CHANGELOG.md` / `VERSION` | What shipped in each release, in user-facing wording; the current `MAJOR.MINOR.PATCH.MICRO` |
+| `TODOS.md` | Known gaps and deferred work, with a Completed section stamped by release |
 
 ## gstack
 

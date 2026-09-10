@@ -62,14 +62,24 @@ Optional (nullable):
 1. `PasswordHash` is **excluded** from `AppUserRequest`, from the `AppUser` response model and
    from every Angular model. There is no form field and no API input for it.
 2. **On CREATE** the repository reads `SysConfig.configValue WHERE configKey = 'appConfig'`,
-   parses it as JSON, takes the `defaultPassword` string property, hashes it with **SHA-256**
-   (UTF-8 bytes → lowercase hex, 64 chars) and stores the result as `PasswordHash`.
-   `PasswordUpdatedTime` is set to `GETUTCDATE()`.
+   parses it as JSON, takes the `defaultPassword` string property, hashes it with
+   **`PasswordHasher.Hash`** (salted PBKDF2-HMAC-SHA256, 210,000 iterations, 16-byte salt, stored as
+   `pbkdf2-sha256$<iterations>$<salt>$<hash>`) and stores the result as `PasswordHash`. Never
+   `Sha256Hex` — that is the legacy read-only format (`Auth.md`, *Password storage*).
+   `PasswordUpdatedTime` is set from the injected **`TimeProvider`**, not `GETUTCDATE()`: the column is the
+   token-revocation stamp and is compared against the token's `iat`, which `JwtTokenIssuer` takes from the
+   same clock. SQL Server's clock trailing the web server's by a second sent that comparison the wrong way.
 3. **On UPDATE** the SQL touches only `UserName` and `IsActive`; `PasswordHash` and
    `PasswordUpdatedTime` are never modified.
 4. **Reset** — `POST /api/app-users/{id}/reset-password` re-applies rule 2 to an existing user
-   (new hash of the current default password, `PasswordUpdatedTime = GETUTCDATE()`), writes a
-   RowAudit `UPDATE` row with `ActionDesc = "PasswordHash (reset to default)"` and returns 204.
+   (new hash of the current default password, `PasswordUpdatedTime` from `TimeProvider`), writes a
+   RowAudit `UPDATE` row with `ActionDesc = "PasswordHash"` and returns 204. The controller then calls
+   `IPasswordStampCache.Invalidate(userId)`, so the target's existing token is rejected on its very next
+   request instead of surviving up to `PasswordStampCache.CacheDuration` — this reset is the one lever an
+   administrator has to end a hijacked session. The description deliberately does **not** say the password
+   was reset to the default: `RowAudit` is readable through the 異動紀錄 badge, and naming the default turned
+   the trail into a list of accounts standing on the shared `SysConfig.appConfig.defaultPassword`, a login
+   anyone could then complete. It is the same wording an ordinary password change produces.
 5. A missing `appConfig` row, invalid JSON, or a missing/empty `defaultPassword` raises
    `AppConfigException`; the controller turns it into **500** with a Chinese message
    (系統設定錯誤). Create is rolled back in that case.
@@ -77,8 +87,9 @@ Optional (nullable):
    password succeeds but is confined to changing the password (API 403 elsewhere, SPA `/change-password`)
    until a password of their own is set. Nothing here needs to flag the row — login detects it.
 
-Helpers: `Infrastructure\PasswordHasher.Sha256Hex(string)` and
+Helpers: `Infrastructure\PasswordHasher.Hash(string)` / `.Verify(...)` / `.IsLegacyFormat(...)` and
 `Infrastructure\AppConfigJson.ExtractDefaultPassword(string? json)` are pure and unit-tested.
+`PasswordHasher.Sha256Hex` still exists to *verify* legacy rows; nothing may store its output.
 
 ---
 
@@ -145,12 +156,17 @@ which the existing AppRole list already treats as an incoming filter.
 | `GET` | `/api/app-users` | List all, `ORDER BY UserId ASC`, includes `RoleCount` |
 | `POST` | `/api/app-users/query` | Filtered query (body: `AppUserQuery`) |
 | `GET` | `/api/app-users/{id}` | Get by **UserId** (string, no `:int`) → 200 (with `RoleIds`) / 404 |
-| `POST` | `/api/app-users` | Create with default-password hash → 201; **409** if `UserId` exists; **500** if appConfig is unusable |
+| `POST` | `/api/app-users` | Create with default-password hash → 201; **409** if `UserId` exists (pre-check) or if a concurrent create wins the race (`DuplicateKeyException` from SQL 2627 / 2601); **500** if appConfig is unusable |
 | `PUT` | `/api/app-users` | Update `UserName` / `IsActive` + roles (UserId from body, immutable) → 204 / 404 |
 | `DELETE` | `/api/app-users/{id}` | Delete (junction rows first) → 204 / 404 / 409 |
-| `POST` | `/api/app-users/{id}/reset-password` | Reset to the default password → 204 / 404 / 500 |
+| `POST` | `/api/app-users/{id}/reset-password` | Reset to the default password, then invalidate the target's password stamp → 204 / 404 / 500 |
 
-No `[Authorize]` attributes.
+Auth: a Bearer JWT is required on every action by the global `AuthorizeFilter`, and `AppUsersController`
+plus the `/api/lookups/app-users` lookup additionally carry
+`[Authorize(Policy = AuthorizationPolicies.Admin)]` — a signed-in non-administrator gets 403 and the
+repository is never reached. The SPA mirrors it with `adminGuard` on `/admin/app-users`. The account's audit
+trail is guarded too: `GET /api/row-audits?tableName=AppUser` needs the same role (`Auth.md`,
+*Authorization rules*).
 
 ---
 
@@ -200,9 +216,10 @@ ORDER BY u.UserId ASC
 ### SQL — INSERT
 
 ```sql
--- @PasswordHash = SHA-256 hex of SysConfig.appConfig.defaultPassword (read on the same connection/transaction)
+-- @PasswordHash = PasswordHasher.Hash of SysConfig.appConfig.defaultPassword (read on the same connection/transaction)
+-- @PasswordUpdatedTime = timeProvider.GetUtcNow().UtcDateTime — the same clock that stamps the token's iat
 INSERT INTO AppUser (UserId, UserName, IsActive, PasswordHash, PasswordUpdatedTime)
-VALUES (@UserId, @UserName, @IsActive, @PasswordHash, GETUTCDATE());
+VALUES (@UserId, @UserName, @IsActive, @PasswordHash, @PasswordUpdatedTime);
 SELECT CAST(SCOPE_IDENTITY() AS int);
 -- then N-N sync
 ```
@@ -217,7 +234,8 @@ UPDATE AppUser SET UserName = @UserName, IsActive = @IsActive WHERE UserId = @Us
 ### SQL — RESET PASSWORD
 
 ```sql
-UPDATE AppUser SET PasswordHash = @PasswordHash, PasswordUpdatedTime = GETUTCDATE() WHERE UserId = @UserId;
+-- @PasswordUpdatedTime = timeProvider.GetUtcNow().UtcDateTime (never GETUTCDATE(): it is the revocation stamp)
+UPDATE AppUser SET PasswordHash = @PasswordHash, PasswordUpdatedTime = @PasswordUpdatedTime WHERE UserId = @UserId;
 ```
 
 ### SQL — DELETE
@@ -233,7 +251,7 @@ DELETE FROM AppUser WHERE UserId = @UserId;
 |--------|--------------------|--------------|--------------|
 | Create | `UserId` | `INSERT` | `UserName` |
 | Update | `UserId` | `UPDATE` | changed columns (`UserName`, `IsActive`) + `RoleIds` when the set changed; **no row** when nothing changed |
-| Reset password | `UserId` | `UPDATE` | `PasswordHash (reset to default)` |
+| Reset password | `UserId` | `UPDATE` | `PasswordHash` (never "reset to default" — see *PasswordHash rules* 4) |
 | Delete | `UserId` | `DELETE` | `UserName` |
 
 Create / Update / Delete go through the generic `IRowAuditWriter.LogInsertAsync / LogUpdateAsync / LogDeleteAsync`

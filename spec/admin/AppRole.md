@@ -95,7 +95,10 @@ handled by the N-N section below. No child-list navigation buttons.
   `[filter]="true"`, `appendTo="body"`, placeholder 選擇使用者（可複選）). Options from
   `GET /api/lookups/app-users`, label `UserName (UserId)`, ordered by `UserName`.
 - **Request field**: `UserIds: List<string>` (`AppRoleRequest`); `AppRole.UserIds` populated
-  on `GetByIdAsync` only (separate query, same connection).
+  on `GetByIdAsync` only (separate query, same connection). `AppRoleRepository.Normalize` takes
+  `IEnumerable<string>?` and null-guards with `ids ?? []`, like its AppUser / Certification / Course
+  siblings: `System.Text.Json` does not honour non-nullable reference annotations, so a body carrying
+  `"userIds": null` sets the property to null and used to throw a `NullReferenceException` → 500.
 - **Sync on save** (create and update, inside the same transaction):
   1. `DELETE FROM AppUserRole WHERE RoleId = @RoleId`
   2. `INSERT INTO AppUserRole (UserId, RoleId) VALUES (@UserId, @RoleId)` per distinct id
@@ -143,7 +146,7 @@ repository.
 | `GET` | `/api/app-roles` | List all, `ORDER BY RoleId ASC`, includes `UserCount` |
 | `POST` | `/api/app-roles/query` | Filtered query (body: `AppRoleQuery`) |
 | `GET` | `/api/app-roles/{id}` | Get by **RoleId** (string, no `:int` constraint) → 200 (with `UserIds`) / 404 |
-| `POST` | `/api/app-roles` | Create → 201 `CreatedAtAction(GetById, { id = RoleId })`; **409** if `RoleId` exists |
+| `POST` | `/api/app-roles` | Create → 201 `CreatedAtAction(GetById, { id = RoleId })`; **409** if `RoleId` exists — from the `ExistsAsync` pre-check, or from `DuplicateKeyException` (SQL 2627 / 2601) when a concurrent create wins the race between that read and the INSERT |
 | `PUT` | `/api/app-roles` | Update (RoleId from body; RoleId immutable) → 204 / 404 |
 | `DELETE` | `/api/app-roles/{id}` | Delete by RoleId (junction rows first) → 204 / 404 / 409 on unexpected FK |
 | `GET` | `/api/lookups/app-users` | User lookup for the multi-select |

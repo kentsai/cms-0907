@@ -132,7 +132,7 @@ This lookup is consumed by the future `Course` and `Promotion2` features (FK dro
 | `GET` | `/api/publish-statuses` | List all, `ORDER BY pkid ASC` |
 | `POST` | `/api/publish-statuses/query` | Filtered query (body: `PublishStatusQuery`) |
 | `GET` | `/api/publish-statuses/{id:int}` | Get by pkid → 200 / 404 |
-| `POST` | `/api/publish-statuses` | Create. `pkid` comes from the body. → 201 `CreatedAtAction` with the entity; **409 Conflict** if `pkid` already exists |
+| `POST` | `/api/publish-statuses` | Create. `pkid` comes from the body. → 201 `CreatedAtAction` with the entity; **409 Conflict** if `pkid` already exists — from the `ExistsAsync` pre-check, or from `DuplicateKeyException` (SQL 2627 / 2601) when a concurrent create wins the race between that read and the INSERT |
 | `PUT` | `/api/publish-statuses` | Update (pkid from body) → 204 / 404 |
 | `DELETE` | `/api/publish-statuses/{id:int}` | Delete → 204 / 404. Deleting a status still referenced by `Course`/`Promotion2` fails the FK constraint → **409 Conflict** with a message |
 | `GET` | `/api/lookups/publish-statuses` | Slim lookup list (see above) |
@@ -206,7 +206,9 @@ ORDER BY pkid ASC
 
 `pkid` is written explicitly. There is no `SCOPE_IDENTITY()` — the repository returns
 `request.Pkid`. Existence is checked first so a duplicate key yields 409 instead of a
-SQL exception.
+SQL exception; the INSERT also catches SQL 2627 / 2601 (`SqlErrorNumbers.IsUniqueViolation`) and throws
+`DuplicateKeyException` → the same 409, because that pre-check is a read followed by a write and a
+concurrent create passes it.
 
 ```sql
 INSERT INTO PublishStatus (pkid, Description, IsDraft, IsPublished, IsDiscontinued)

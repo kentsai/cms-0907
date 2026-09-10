@@ -15,8 +15,10 @@ unsalted SHA-256 hex digest keep working and are rewritten in the new format on 
 signing secret and the default password both live in the JSON of
 `SysConfig.configValue WHERE configKey = 'appConfig'`. Authorization is **authentication plus one role check**:
 every action except `POST /api/auth/login` needs a valid token, and the endpoints that hand out access itself —
-`AppUsersController`, `AppRolesController` and the `app-users` / `app-roles` lookups — additionally require the
-`Admin` role (**403** otherwise). Every other endpoint is open to any authenticated user. The Angular shell hides
+`AppUsersController`, `AppRolesController`, `PublishStatusesController` and the `app-users` / `app-roles`
+lookups — additionally require the `Admin` role (**403** otherwise), as does the audit trail of those accounts
+and roles (`GET /api/row-audits?tableName=AppUser|AppRole`). Every other endpoint, including every content
+table's audit trail and the `publish-statuses` lookup, is open to any authenticated user. The Angular shell hides
 the 系統管理 Admin menu group and `adminGuard` blocks its routes, but those are the user experience; the API is the
 control. A password change (self-service or admin reset) invalidates every token issued
 before it, so the user must log in again with the new password. A login made **with the default password**
@@ -30,7 +32,7 @@ other action answers 403 until the user has set a password of their own.
 | Secrets | `SysConfig.appConfig.symmetricSecurityKey` (≥ 32 UTF-8 bytes), `SysConfig.appConfig.defaultPassword` |
 | Token | HS256, issuer `CMS.API`, no audience, lifetime **24 h**, claims `sub` / `jti` / `iat` / `userId` / `userName` / `role`* / `mustChangePassword`† |
 | Session (browser) | `sessionStorage['auth-profile']` = `{ userId, userName, accessToken }`; gone when the tab closes |
-| Authorization | Global `AuthorizeFilter` (authenticated user); `[AllowAnonymous]` only on `AuthController.Login`; `[Authorize(Policy = AuthorizationPolicies.Admin)]` on `AppUsersController`, `AppRolesController` and `LookupsController.AppUsers` / `.AppRoles` |
+| Authorization | Global `AuthorizeFilter` (authenticated user); `[AllowAnonymous]` only on `AuthController.Login`; `[Authorize(Policy = AuthorizationPolicies.Admin)]` on `AppUsersController`, `AppRolesController`, `PublishStatusesController` and `LookupsController.AppUsers` / `.AppRoles`; an in-action role check on `RowAuditsController.GetForRecord` for `tableName` `AppUser` / `AppRole` |
 | Default-password lock | Global `PasswordChangeRequiredFilter`: token with `mustChangePassword` → **403** everywhere except `[AllowPasswordChangeRequired]` (`ChangePassword` only) |
 | Revocation | Token `iat` < `AppUser.PasswordUpdatedTime` (whole seconds) → 401 |
 
@@ -93,8 +95,11 @@ bilingually (Chinese rule + English gloss) under the new-password field; field-r
    `0-9`, ASCII symbol (any other printable ASCII: `!`–`/`, `:`–`@`, `[`–`` ` ``, `{`–`~`). Whitespace, CJK and
    full-width characters are allowed but count towards no class. Applies to self-service changes only; the
    admin default password (`AppUser.md`) is not policy-checked.
-4. `PasswordUpdatedTime` is UTC (`GETUTCDATE()` on create/reset, `TimeProvider.GetUtcNow()` on self-service
-   change) and doubles as the **token revocation stamp** (see below).
+4. `PasswordUpdatedTime` is UTC and comes from `TimeProvider.GetUtcNow()` on every write — self-service change,
+   admin create and admin reset alike. It doubles as the **token revocation stamp** (see below) and is compared
+   against the token's `iat`, which `JwtTokenIssuer` takes from the same `TimeProvider`; create and reset used
+   SQL `GETUTCDATE()` until v1.0.0.0, so a database clock trailing the web server's could make an admin reset
+   revoke nothing.
 
 ---
 
@@ -188,13 +193,20 @@ without any schema change.
 - `AuthController.Login` is the **only** `[AllowAnonymous]` action in the assembly; no controller carries a
   class-level `[AllowAnonymous]` (enforced by a reflection test).
 - **Admin policy.** `Program.cs` registers `AuthorizationPolicies.Admin` = `RequireRole("Admin")`.
-  `AppUsersController` and `AppRolesController` carry it at class level, and
+  `AppUsersController`, `AppRolesController` and `PublishStatusesController` carry it at class level, and
   `LookupsController.AppUsers` / `.AppRoles` at action level (they enumerate every account / role and feed
   only the 系統管理 pages). A signed-in non-administrator gets **403** and the repository is never reached; a
   missing or invalid token is still **401**, because the global `AuthorizeFilter` runs first. Reflection tests
-  pin the guarded set to exactly those two controllers and those two lookup actions.
-  Every other endpoint (all content CRUD, the remaining lookups, RowAudit, self-service profile and password)
-  needs authentication only.
+  pin the guarded set to exactly those three controllers and those two lookup actions. The
+  `publish-statuses` **lookup** is deliberately outside the set: it fills the course form's 上架狀態 dropdown.
+- **Admin-only audit tables.** `RowAuditsController.GetForRecord` checks the role itself, in the action, for
+  `tableName` `AppUser` or `AppRole` (`AdminOnlyTables`, `StringComparer.OrdinalIgnoreCase`, matched after
+  `Trim()`) → **403** `{ "message": "只有管理者可以查看帳號與角色的異動紀錄。" }`. An attribute cannot express
+  it: the table is a query-string value, so the class-level policy above guards the account and role rows but
+  not their history, and any signed-in user could read who changed which account and when. The test is
+  `User?.IsInRole(...) != true`, so a null principal fails closed. Every content table's trail is unchanged.
+  Every other endpoint (all content CRUD, the remaining lookups, content RowAudit, self-service profile and
+  password) needs authentication only.
 - Rationale: before this policy existed any signed-in user could create accounts, delete them, rewrite role
   membership through `AppRoleRequest.UserIds`, and reset any administrator's password to the shared
   `defaultPassword` and then take that account over. Hiding the menu in the shell was the only obstacle, and a
@@ -249,8 +261,9 @@ user)"`, commit; then `IPasswordStampCache.Invalidate(userId)` and **204**. `IsA
 token already proves an active login). The new password may equal the old one (no history rule).
 
 **Consequence:** the token that made the request — and every other token issued before the new
-`PasswordUpdatedTime` — is rejected on the very next request. The admin reset in `AppUser.md` has the same
-effect within the 1-minute stamp cache (it does not call `Invalidate`).
+`PasswordUpdatedTime` — is rejected on the very next request. The admin reset in `AppUser.md` now calls
+`Invalidate` too, so it is immediate as well; it used to take up to the 1-minute stamp-cache TTL, which
+mattered because that reset is how an administrator ends a hijacked session.
 
 Frontend: the form is the shared `ChangePasswordFormComponent` (`features/auth/change-password-form`,
 `<app-change-password-form>`), hosted by the second card 變更密碼 on `/profile` and by the `/change-password`

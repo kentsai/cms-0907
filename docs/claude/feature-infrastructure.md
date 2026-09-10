@@ -66,8 +66,16 @@ that is not the API.
 - `Infrastructure\AuditHelper.ChangedColumns` diffs two objects by property name for UPDATE audit
   descriptions (non-string sequences compare element-wise, so equal pkid lists are not reported as
   changed; `[AuditIgnore]` properties are skipped).
+- `Infrastructure\SqlErrorNumbers` — the SQL Server error numbers the repositories translate:
+  `ForeignKeyViolation` 547, `UniqueConstraintViolation` 2627, `UniqueIndexViolation` 2601 and
+  `IsUniqueViolation(int)`. Use it instead of re-declaring the numbers per repository (that duplication is
+  how one of the eight ended up catching a different set).
 - `Infrastructure\EntityInUseException` — repositories throw it on SQL error 547 (FK
   violation); controllers return 409.
+- `Infrastructure\DuplicateKeyException` — repositories throw it on 2627 / 2601 from an INSERT; controllers
+  return 409 with the same message the `ExistsAsync` pre-check produces. The pre-check is a read followed by a
+  write, so a concurrent create with the same key passes it and loses on the primary key instead; without this
+  the loser surfaced as a 500. Wired into AppRole, AppUser and PublishStatus creates.
 - `Infrastructure\PasswordHasher` (salted PBKDF2-HMAC-SHA256, 210,000 iterations, 16-byte salt;
   `Hash` / `Verify` / `IsLegacyFormat`, and legacy unsalted SHA-256 rows are verified then rewritten in
   place on the owner's next login) and
@@ -131,13 +139,19 @@ that is not the API.
   holds only lookups for tables with **no** feature yet (currently `job-categories`,
   `training-centers`, `promotions`) — move each one out when its feature is generated.
 - `Infrastructure\WeekRange` snaps a `DateOnly` to its Monday–Sunday week (FeaturedPromoItem
-  board). `Infrastructure\SlotOccupiedException` is the unique-key (2627/2601) counterpart of
-  `EntityInUseException`; controllers return 409 for both.
+  board). `Infrastructure\SlotOccupiedException` is the FeaturedPromoItem-specific unique-key
+  (`SqlErrorNumbers.IsUniqueViolation`) counterpart of `EntityInUseException`; controllers return 409 for
+  both, as they do for `DuplicateKeyException`.
 - `Controllers\RowAuditsController` (`GET /api/row-audits?tableName=&pkid=`, both required → 400
   `ValidationProblem`) returns the record's **full** audit trail newest first (`ORDER BY [DateTime] DESC, pkid
   DESC`) as `Models\RowAudit` = `{ dateTime, userName, actionType, actionDesc }` only, via
   `IRowAuditRepository.GetForRecordAsync(tableName, pkid)`. `pkid` is matched as text against
-  `PrimaryKeyValues`, so it is the numeric pkid or the `[AuditKey]` string (`RoleId` / `UserId`). Tests:
+  `PrimaryKeyValues`, so it is the numeric pkid or the `[AuditKey]` string (`RoleId` / `UserId`).
+  `tableName` `AppUser` / `AppRole` (the `AdminOnlyTables` set, `OrdinalIgnoreCase`, matched after `Trim()`)
+  additionally requires the `Admin` role → **403**. The check is in the action, not an `[Authorize]` attribute,
+  because the table arrives as a query-string value: the Admin policy on `AppUsersController` /
+  `AppRolesController` guards the rows but not their history. `User?.IsInRole(...) != true` rather than `!` so a
+  null principal fails closed. Tests:
   `RowAuditsControllerTests`, `Repositories\RowAuditRepositoryTests` (recording connection),
   `Infrastructure\RowAuditsEndpointTests` (through `CmsApiFactory`, which now also mocks `IRowAuditRepository`).
 - Dapper 2.1.79 has **no** `DateOnly` mapping (its net8.0 build never references the type): without a handler
@@ -232,6 +246,34 @@ browser (login, list, detail QR, print view, admin page, Swagger) with zero viol
 - API base URL: `src\environments\environment*.ts` (`apiBaseUrl`). `environment.ts` is
   production; `environment.development.ts` replaces it via `fileReplacements`.
 - Path aliases: `@environments/*`, `@app/*`, `@core/*`, `@features/*`.
+
+### Global styles (`src\CMS.NG\src\styles.scss`)
+
+Unscoped rules shared by all eight list pages and every form. Component styles are injected **after** this
+file, so a component rule wins at equal specificity — check the component before fixing anything here.
+
+- `--cms-error-color` (`:root`) — `--p-red-600` / `#dc2626`. Aura's `--p-red-500` is 3.76:1 on white, under
+  the WCAG AA 4.5:1 floor for text, and validation messages are the only signal a field failed. Use this token
+  for error **text**; borders are exempt (3:1 applies to non-text), which is why `.cell-invalid` in
+  `course-list.component.scss` keeps `--p-red-500`.
+- `.field-error` — the token plus `font-size: 0.875rem`. 14px is the floor for 繁體中文: CJK glyphs carry
+  several times the stroke density of Latin at the same em size and below it the strokes merge.
+- Row-action icon buttons (`.p-datatable .col-actions .p-button-icon-only`, `.row__actions
+  .p-button-icon-only`) get `min-width` / `min-height: 44px`. Aura renders `size="small"` icon-only buttons at
+  1.75rem = 28px, well under the tap-target minimum; the sidebar links were raised separately in `app.scss`.
+- `.muted-if-empty` — `--p-text-muted-color` for the em-dash placeholder in the partner and course tables.
+  Both templates referenced the class before it existed, so the placeholder rendered in full body colour.
+- `.p-datatable th { white-space: nowrap }` with `.col-actions` `position: sticky; right: 0;
+  background: inherit` — Chinese breaks between any two characters, so without `nowrap` the browser compresses
+  whichever column lacks it and headings stack one glyph per line; `nowrap` then widens the table past the
+  viewport, which is what makes the sticky action column necessary.
+- **Four flex-nowrap header families** wrap below 640px. Three are handled by the shared block here; the
+  fourth, `.week-nav` on the promo board, is in `featured-promo-list.component.scss` because that component
+  sets `justify-content: center` in its own stylesheet (a centred row overflows to *both* sides, and content
+  left of a scroll container cannot be reached at all — 上一週 was unreachable on a 375px phone). A pointer
+  comment in `styles.scss` marks the split: fixing one family means checking all four.
+- `app.scss` sets `height: 100vh` then `height: 100dvh` on `.app-shell` — `vh` measures the viewport with the
+  mobile URL bar retracted, so the `vh` line stays only as the fallback.
 
 ### App shell
 
