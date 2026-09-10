@@ -4,8 +4,16 @@ html,
 body {
   height: 100%;
   margin: 0;
-  font-family: 'Segoe UI', 'Microsoft JhengHei', system-ui, -apple-system, sans-serif;
+  // Name the Traditional Chinese faces explicitly, and name one per platform. `Microsoft JhengHei` ships
+  // only on Windows, so the old stack fell straight through to `system-ui` everywhere else — and on most
+  // non-Windows systems that resolves to a CJK face whose default glyph forms are *Simplified*, which
+  // renders 繁體中文 with the wrong shapes. Same stack the print view has used since it was written.
+  font-family: 'Segoe UI', 'Microsoft JhengHei', 'PingFang TC', 'Noto Sans TC', system-ui, -apple-system,
+    sans-serif;
   color: var(--p-text-color);
+  // CJK glyphs are dense and square; the browser default of roughly 1.2 crowds them. PrimeNG's own
+  // components already render at 1.5.
+  line-height: 1.6;
   background: var(--p-surface-50);
 }
 
