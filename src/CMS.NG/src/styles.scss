@@ -47,6 +47,19 @@ body {
   .page-header__actions .p-button-label {
     white-space: nowrap;
   }
+
+  /* Topbar on phones: its children already add up to the full 375px, so every label broke one character
+     per line. Drop the `個人資料` / `請先變更密碼` hint — the user icon and name still link to the profile,
+     and the locked screen repeats that hint in its own banner — which buys back the ~55px the rest needs. */
+  .app-topbar__user-hint {
+    display: none;
+  }
+
+  .app-topbar__title,
+  .app-topbar__user-name,
+  .app-topbar__logout .p-button-label {
+    white-space: nowrap;
+  }
 }
 
 .field {
