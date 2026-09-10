@@ -11,6 +11,10 @@ public sealed class AppUserCredential
     public string UserName { get; set; } = string.Empty;
     public bool IsActive { get; set; }
 
-    /// <summary>SHA-256 hex of the password (see <see cref="Infrastructure.PasswordHasher"/>).</summary>
+    /// <summary>
+    /// The stored password hash, in whichever format the row holds: a salted PBKDF2 string written by
+    /// <see cref="Infrastructure.PasswordHasher.Hash"/>, or a legacy unsalted SHA-256 hex digest on a row not yet
+    /// rewritten. Only <see cref="Infrastructure.PasswordHasher.Verify"/> reads it; never compare it directly.
+    /// </summary>
     public string PasswordHash { get; set; } = string.Empty;
 }

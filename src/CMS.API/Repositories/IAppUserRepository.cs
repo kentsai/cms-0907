@@ -13,7 +13,8 @@ public interface IAppUserRepository
     Task<bool> ExistsAsync(string userId, CancellationToken cancellationToken);
 
     /// <summary>
-    /// Inserts the user with <c>PasswordHash</c> = SHA-256 of <c>SysConfig.appConfig.defaultPassword</c>, syncs the
+    /// Inserts the user with <c>PasswordHash</c> = <see cref="Infrastructure.PasswordHasher.Hash"/> of
+    /// <c>SysConfig.appConfig.defaultPassword</c> (never <c>Sha256Hex</c>), syncs the
     /// role assignments, and returns the new identity pkid. Throws <see cref="Infrastructure.AppConfigException"/>
     /// when the default password cannot be resolved.
     /// </summary>

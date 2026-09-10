@@ -122,7 +122,7 @@ public class AuthController(
     /// Self-service password change for the token's user. In order: the current password must hash to the stored
     /// <c>PasswordHash</c> (otherwise nothing changes), the new password must satisfy <see cref="PasswordPolicy"/>,
     /// and the confirmation must match. Every rejection is a 400 <c>ValidationProblem</c> keyed by the offending
-    /// field. On success <c>PasswordHash</c> = SHA-256(new) and <c>PasswordUpdatedTime</c> = now; no hash is ever
+    /// field. On success <c>PasswordHash</c> = <see cref="PasswordHasher.Hash"/>(new) and <c>PasswordUpdatedTime</c> = now; no hash is ever
     /// returned. The new <c>PasswordUpdatedTime</c> also invalidates every token issued before it — including the
     /// one this request was made with — so the caller must log in again with the new password.
     /// This is the only action a default-password session may call (<see cref="AllowPasswordChangeRequiredAttribute"/>).
