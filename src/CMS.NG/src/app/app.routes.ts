@@ -76,7 +76,10 @@ const featureRoutes: Routes = [
     ]
   },
   {
+    // Administrators only, mirroring the API's Admin policy on PublishStatusesController. The read-only
+    // lookup that fills the course form's 上架狀態 dropdown is not behind this and stays open to everyone.
     path: 'admin/publish-statuses',
+    canActivate: [adminGuard],
     children: [
       {
         path: '',

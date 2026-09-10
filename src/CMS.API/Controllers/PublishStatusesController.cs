@@ -1,11 +1,23 @@
 using CMS.API.Infrastructure;
 using CMS.API.Models;
 using CMS.API.Repositories;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace CMS.API.Controllers;
 
+/// <summary>
+/// Administrators only (<see cref="AuthorizationPolicies.Admin"/>, on top of the global authentication filter):
+/// these rows are the publish-state vocabulary every course's 上架狀態 points at, not per-course content, and the
+/// 系統管理 Admin menu group has always presented them that way. A signed-in non-administrator gets <b>403</b>.
+/// <para>
+/// The read-only lookup used to populate the course form's status dropdown lives on
+/// <c>GET /api/lookups/publish-statuses</c> and stays open to every signed-in user — locking it here would
+/// empty that dropdown for the editors who need it.
+/// </para>
+/// </summary>
 [ApiController]
+[Authorize(Policy = AuthorizationPolicies.Admin)]
 [Route("api/publish-statuses")]
 [Produces("application/json")]
 public class PublishStatusesController(IPublishStatusRepository repository) : ControllerBase

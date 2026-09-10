@@ -43,9 +43,11 @@ smoke-test with `GET :5001/api/publish-statuses` (401 without a token = up).
 - No local `CMS` database: unit tests pass, live data calls fail.
 - MSB3027 on `CMS.API.exe` = API running; build with `-p:ArtifactsPath=<tmp>` instead of killing it.
 - Every API action except `POST /api/auth/login` needs a Bearer JWT (global filter). The account / role
-  endpoints (`AppUsersController`, `AppRolesController`, the `app-users` + `app-roles` lookups) additionally
-  require the `Admin` role via `[Authorize(Policy = AuthorizationPolicies.Admin)]` — 403 otherwise; the SPA
-  mirrors it with `adminGuard`. `PasswordHash` never crosses the API, and a password change revokes older
+  endpoints (`AppUsersController`, `AppRolesController`, the `app-users` + `app-roles` lookups) and
+  `PublishStatusesController` additionally require the `Admin` role via
+  `[Authorize(Policy = AuthorizationPolicies.Admin)]` — 403 otherwise; the SPA mirrors it with `adminGuard`.
+  The `publish-statuses` **lookup** stays open to every signed-in user: it fills the course form's 上架狀態
+  dropdown. `PasswordHash` never crosses the API, and a password change revokes older
   tokens. A login with the default password gets a token that only opens `change-password` (403 elsewhere;
   SPA route `/change-password`).
 - Passwords are salted PBKDF2 (`PasswordHasher.Hash` / `.Verify`); legacy unsalted SHA-256 rows still verify
